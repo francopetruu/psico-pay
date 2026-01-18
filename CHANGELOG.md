@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Database schema with Drizzle ORM (patients, sessions, payment_preferences, notifications)
+- Database connection pool with pg
+- Type-safe schema with relations and indexes
 - Project foundation with TypeScript and Node.js 20+
 - Package.json with all required dependencies
 - TypeScript configuration (tsconfig.json)
