@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Project foundation with TypeScript and Node.js 20+
+- Package.json with all required dependencies
+- TypeScript configuration (tsconfig.json)
+- Vitest testing configuration
+- Drizzle ORM configuration
+- Environment variable validation with Zod
+- Pino structured logging
+- Project folder structure (config, db, lib, repositories, services, jobs, routes, types)
+- Core type definitions for entities
+- Module README documentation
+- Main project README
 - Branching strategy documentation
 - Project changelog
 
