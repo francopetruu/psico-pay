@@ -7,37 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Nothing yet.
+
+---
+
+## [0.1.0] - 2025-01-18
+
 ### Added
-- Express HTTP server with webhook endpoints
-- Mercado Pago webhook handler for payment notifications
-- Payment redirect pages (success/failure/pending)
-- Health check endpoint
-- Main application bootstrap with all dependencies wired
-- SessionMonitorJob for cron-based workflow orchestration
-- Scheduler for node-cron job scheduling
-- Repository layer (PatientRepository, SessionRepository, PaymentPreferenceRepository, NotificationRepository)
-- NotificationService for Twilio WhatsApp messaging
-- PaymentService for Mercado Pago integration
-- CalendarService for Google Calendar API integration
-- Database schema with Drizzle ORM (patients, sessions, payment_preferences, notifications)
-- Database connection pool with pg
-- Type-safe schema with relations and indexes
-- Project foundation with TypeScript and Node.js 20+
-- Package.json with all required dependencies
-- TypeScript configuration (tsconfig.json)
-- Vitest testing configuration
-- Drizzle ORM configuration
+
+#### Core Infrastructure
+- Project foundation with TypeScript 5.3+ and Node.js 20+
+- PostgreSQL database with Drizzle ORM
 - Environment variable validation with Zod
 - Pino structured logging
-- Project folder structure (config, db, lib, repositories, services, jobs, routes, types)
-- Core type definitions for entities
-- Module README documentation
-- Main project README
+
+#### Database Schema
+- `patients` table for patient contact information
+- `sessions` table for therapy session tracking
+- `payment_preferences` table for Mercado Pago links
+- `notifications` table for audit logging
+- Type-safe schema with relations and indexes
+
+#### Services
+- **CalendarService**: Google Calendar API integration
+  - Fetch upcoming events (48h window)
+  - Parse patient info from event title/description
+  - Extract Google Meet links
+- **PaymentService**: Mercado Pago integration
+  - Create payment preferences with 24h expiration
+  - Verify payment status via API
+  - Webhook support
+- **NotificationService**: Twilio WhatsApp integration
+  - Payment reminder templates
+  - Payment confirmation
+  - Meet link delivery
+  - Late/courtesy reminders
+
+#### Repository Layer
+- PatientRepository with find/create operations
+- SessionRepository with time-based queries
+- PaymentPreferenceRepository with expiration handling
+- NotificationRepository with audit logging
+
+#### Cron Job
+- SessionMonitorJob running hourly
+  - Sync calendar events with database
+  - Send 24h payment reminders
+  - Send 2h reminders (paid/pending)
+  - Deliver Meet links to paid sessions
+- Scheduler with node-cron
+  - Argentina timezone support
+  - Concurrency protection
+
+#### HTTP Server
+- Express server for webhooks
+- Mercado Pago webhook handler (async processing)
+- Payment redirect pages (success/failure/pending)
+- Health check endpoint
+
+#### Documentation
+- Comprehensive README with setup instructions
+- Module-level README files
 - Branching strategy documentation
-- Project changelog
+- Environment variable template
+
+### Technical Details
+
+- **Architecture**: Layered (Routes → Services → Repositories → Database)
+- **Patterns**: Repository pattern, Dependency Injection, Factory functions
+- **Error Handling**: Try-catch with structured logging, graceful degradation
+- **Idempotency**: Notification flags prevent duplicate sends
 
 ---
 
 ## Version History
 
-Future releases will be documented here following semantic versioning.
+- **0.1.0** - Initial MVP release (Phase 1)
