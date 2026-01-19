@@ -24,10 +24,29 @@ Integrates with Google Calendar API to fetch and parse therapy sessions.
 - Must have Google Meet link
 - Duration between 30-90 minutes
 
-### PaymentService
-- Creates Mercado Pago payment preferences
-- Verifies payment status
-- Handles payment webhook processing
+### PaymentService (`payment.service.ts`)
+**Status: Implemented**
+
+Integrates with Mercado Pago API for payment processing.
+
+**Methods:**
+- `createPaymentPreference(input)`: Creates checkout preference with 24h expiration
+- `getPaymentDetails(paymentId)`: Fetches payment status from Mercado Pago
+- `isPaymentApproved(payment)`: Validates if payment status is approved
+- `validateWebhookSignature(signature, body, secret)`: Validates webhook authenticity
+
+**Payment Preference:**
+- Currency: ARS
+- Expiration: 24 hours from creation
+- External reference: Session ID (for linking)
+- Notification URL: Webhook endpoint for payment updates
+
+**Payment Status Values:**
+- `approved`: Payment successful
+- `pending`: Payment in process
+- `rejected`: Payment failed
+- `cancelled`: Payment cancelled by user
+- `refunded`: Payment refunded (Phase 2)
 
 ### NotificationService
 - Sends WhatsApp messages via Twilio
