@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- NotificationService for Twilio WhatsApp messaging
 - PaymentService for Mercado Pago integration
 - CalendarService for Google Calendar API integration
 - Database schema with Drizzle ORM (patients, sessions, payment_preferences, notifications)
