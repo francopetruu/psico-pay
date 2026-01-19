@@ -12,3 +12,13 @@ export {
   type PaymentPreferenceResult,
   type PaymentDetails,
 } from './payment.service.js';
+
+export {
+  NotificationService,
+  createNotificationService,
+  type SendMessageInput,
+  type SendMessageResult,
+  type PaymentReminderData,
+  type PaymentConfirmationData,
+  type MeetLinkData,
+} from './notification.service.js';

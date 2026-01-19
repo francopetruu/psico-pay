@@ -48,10 +48,31 @@ Integrates with Mercado Pago API for payment processing.
 - `cancelled`: Payment cancelled by user
 - `refunded`: Payment refunded (Phase 2)
 
-### NotificationService
-- Sends WhatsApp messages via Twilio
-- Manages message templates
-- Handles delivery status
+### NotificationService (`notification.service.ts`)
+**Status: Implemented**
+
+Sends WhatsApp messages via Twilio for patient communication.
+
+**Methods:**
+- `sendWhatsAppMessage(input)`: Low-level message sending
+- `sendPaymentReminder(phone, data)`: 24h payment reminder with link
+- `sendPaymentConfirmation(phone, data)`: Payment success notification
+- `sendMeetLink(phone, data)`: Google Meet link (15 min before)
+- `sendLatePaymentReminder(phone, data)`: 2h reminder (not paid)
+- `sendCourtesyReminder(phone, data)`: 2h reminder (already paid)
+- `isValidPhoneNumber(phone)`: E.164 format validation
+
+**Message Templates:**
+- Payment reminder (24h before)
+- Payment confirmation
+- Meet link delivery (15 min before)
+- Late payment reminder (2h before, pending)
+- Courtesy reminder (2h before, paid)
+
+**Features:**
+- Spanish locale date formatting
+- Phone number masking for logs (privacy)
+- E.164 phone format validation
 
 ### SessionService
 - Orchestrates session-related business logic
