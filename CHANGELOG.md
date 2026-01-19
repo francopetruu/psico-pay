@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Repository layer (PatientRepository, SessionRepository, PaymentPreferenceRepository, NotificationRepository)
 - NotificationService for Twilio WhatsApp messaging
 - PaymentService for Mercado Pago integration
 - CalendarService for Google Calendar API integration
