@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- SessionMonitorJob for cron-based workflow orchestration
+- Scheduler for node-cron job scheduling
 - Repository layer (PatientRepository, SessionRepository, PaymentPreferenceRepository, NotificationRepository)
 - NotificationService for Twilio WhatsApp messaging
 - PaymentService for Mercado Pago integration
