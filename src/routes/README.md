@@ -1,33 +1,82 @@
 # Routes Module
 
-This directory contains Express route definitions.
+This directory contains Express route definitions for PsicoPay.
 
 ## Endpoints
 
-### POST /webhook/mercadopago
-Mercado Pago payment webhook handler.
+### Health (`health.routes.ts`)
+**Status: Implemented**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check endpoint |
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-01-18T00:00:00.000Z",
+  "uptime": 3600
+}
+```
+
+### Payment (`payment.routes.ts`)
+**Status: Implemented**
+
+Mercado Pago redirect endpoints after payment completion.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/payment/success` | Successful payment redirect |
+| GET | `/payment/failure` | Failed payment redirect |
+| GET | `/payment/pending` | Pending payment redirect |
+
+Each endpoint displays a styled HTML page with appropriate messaging.
+
+### Webhook (`webhook.routes.ts`)
+**Status: Implemented**
+
+Mercado Pago webhook handler for payment notifications.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/webhook/mercadopago` | Payment notification webhook |
 
 **Behavior:**
-1. Validate webhook signature
-2. Respond 200 OK immediately
-3. Process payment notification asynchronously
-4. Update session payment status
-5. Send confirmation message to patient
+1. Responds 200 OK immediately (required by MP)
+2. Processes webhook asynchronously
+3. Validates payment type (only `payment`)
+4. Fetches payment details from MP API
+5. Verifies payment is `approved`
+6. Updates session payment status
+7. Sends WhatsApp confirmation to patient
+8. Logs notification result
 
-### GET /health
-Health check endpoint for monitoring.
+**Security:**
+- TODO: HMAC signature validation before production
+- Idempotency check (prevents duplicate processing)
 
-### GET /payment/success
-Redirect destination after successful payment.
+## Server Setup
 
-### GET /payment/failure
-Redirect destination after failed payment.
+```typescript
+import { createServer, startServer } from './server.js';
 
-### GET /payment/pending
-Redirect destination for pending payments.
+const app = createServer(
+  {
+    paymentService,
+    notificationService,
+    repositories,
+  },
+  { port: 3000 }
+);
 
-## Security
+await startServer(app, { port: 3000 });
+```
 
-- Webhook signature validation (HMAC-SHA256)
-- Rate limiting on all endpoints
-- HTTPS required in production
+## Request Logging
+
+All requests are logged with:
+- Method
+- Path
+- Status code
+- Duration (ms)
