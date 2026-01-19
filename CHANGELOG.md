@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Express HTTP server with webhook endpoints
+- Mercado Pago webhook handler for payment notifications
+- Payment redirect pages (success/failure/pending)
+- Health check endpoint
+- Main application bootstrap with all dependencies wired
 - SessionMonitorJob for cron-based workflow orchestration
 - Scheduler for node-cron job scheduling
 - Repository layer (PatientRepository, SessionRepository, PaymentPreferenceRepository, NotificationRepository)
