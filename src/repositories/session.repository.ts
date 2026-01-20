@@ -1,4 +1,4 @@
-import { eq, and, between, sql } from 'drizzle-orm';
+import { eq, and, between } from 'drizzle-orm';
 import {
   type Database,
   sessions,
