@@ -1,4 +1,4 @@
-import { differenceInMinutes, format } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { logger } from '../lib/logger.js';
 import { config } from '../config/index.js';
@@ -6,7 +6,6 @@ import {
   CalendarService,
   PaymentService,
   NotificationService,
-  type ParsedSessionInfo,
 } from '../services/index.js';
 import {
   type Repositories,
