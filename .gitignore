@@ -3,6 +3,11 @@ node_modules/
 
 # Build output
 dist/
+.next/
+out/
+
+# Turborepo
+.turbo/
 
 # Environment variables
 .env
@@ -23,12 +28,16 @@ Thumbs.db
 logs/
 *.log
 npm-debug.log*
+pnpm-debug.log*
 
 # Test coverage
 coverage/
 
 # Drizzle
 drizzle/*.sql
+
+# TypeScript build info
+*.tsbuildinfo
 
 # Misc
 *.tgz

@@ -4,7 +4,13 @@ dist
 .gitignore
 .env
 .env.example
+.env.*
 *.md
 scripts/
 .vscode/
+.turbo
 *.log
+coverage/
+*.tsbuildinfo
+apps/web
+.next

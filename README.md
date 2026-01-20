@@ -1,6 +1,6 @@
 # PsicoPay
 
-Automated payment collection system for remote therapy sessions.
+Automated payment collection system for remote therapy sessions with a management dashboard.
 
 ## Overview
 
@@ -9,6 +9,7 @@ PsicoPay automates the payment collection process for psychology sessions by:
 - Sending payment reminders via WhatsApp 24 hours before sessions
 - Processing payments through Mercado Pago
 - Delivering Google Meet links only after payment confirmation
+- Providing a management dashboard for therapists
 
 ## Features
 
@@ -17,11 +18,13 @@ PsicoPay automates the payment collection process for psychology sessions by:
 - **Google Calendar Integration**: Automatic session detection from calendar events
 - **WhatsApp Notifications**: Patient communication via Twilio
 - **Mercado Pago Integration**: Secure payment processing with webhooks
-- **Audit Logging**: Complete notification history for tracking
+- **Management Dashboard**: View sessions, patients, payments, and reports
+- **Authentication**: Secure login with NextAuth.js
+- **Analytics**: Revenue reports, payment status distribution, and trends
 
 ## How It Works
 
-1. **Psychologist creates calendar event** with title "Sesión - [Patient Name]"
+1. **Psychologist creates calendar event** with title "Sesion - [Patient Name]"
 2. **Cron job detects session** and creates database record
 3. **24h before**: Payment link sent via WhatsApp
 4. **Patient pays**: Webhook confirms payment, confirmation sent
@@ -31,11 +34,17 @@ PsicoPay automates the payment collection process for psychology sessions by:
 
 | Component | Technology |
 |-----------|------------|
+| Monorepo | pnpm workspaces + Turborepo |
 | Runtime | Node.js 20+ |
 | Language | TypeScript 5.3+ |
-| Database | PostgreSQL 15+ |
+| Database | PostgreSQL 15+ (Neon) |
 | ORM | Drizzle ORM |
-| Web Framework | Express.js |
+| API Server | Express.js |
+| Dashboard | Next.js 14 (App Router) |
+| UI | Tailwind CSS + shadcn/ui |
+| API Layer | tRPC |
+| Auth | NextAuth.js v5 |
+| Charts | Recharts |
 | Scheduler | node-cron |
 | Logging | Pino |
 | Calendar | Google Calendar API |
@@ -45,17 +54,37 @@ PsicoPay automates the payment collection process for psychology sessions by:
 ## Project Structure
 
 ```
-src/
-├── config/         # Environment validation and app config
-├── db/             # Database schema (Drizzle) and connection
-├── lib/            # Shared utilities (logger)
-├── repositories/   # Data access layer (Repository pattern)
-├── services/       # Business logic (Calendar, Payment, Notification)
-├── jobs/           # Cron job (SessionMonitor, Scheduler)
-├── routes/         # Express routes (webhooks, health)
-├── types/          # TypeScript type definitions
-├── index.ts        # Application entry point
-└── server.ts       # Express server setup
+psico-pay/
+├── apps/
+│   ├── api/                 # Express API + Cron jobs
+│   │   ├── src/
+│   │   │   ├── config/      # Environment validation
+│   │   │   ├── lib/         # Logger, utilities
+│   │   │   ├── repositories/# Data access layer
+│   │   │   ├── services/    # Business logic
+│   │   │   ├── jobs/        # Cron jobs
+│   │   │   ├── routes/      # Express routes
+│   │   │   └── types/       # TypeScript types
+│   │   └── scripts/         # Admin scripts
+│   │
+│   └── web/                 # Next.js Dashboard
+│       ├── src/
+│       │   ├── app/         # App Router pages
+│       │   ├── components/  # UI components
+│       │   ├── lib/         # Utils, auth, db, trpc
+│       │   └── server/      # tRPC routers
+│       └── scripts/         # Admin scripts
+│
+├── packages/
+│   └── db/                  # Shared Drizzle schemas
+│       ├── src/
+│       │   ├── schema/      # Database tables
+│       │   └── migrations/  # SQL migrations
+│       └── drizzle.config.ts
+│
+├── package.json             # Root workspace
+├── pnpm-workspace.yaml
+└── turbo.json
 ```
 
 ## Getting Started
@@ -63,10 +92,11 @@ src/
 ### Prerequisites
 
 - Node.js 20+
-- PostgreSQL 15+
-- Google Cloud Project with Calendar API enabled
+- pnpm 9+
+- PostgreSQL 15+ (or Neon serverless)
+- Google Cloud Project with Calendar API
 - Mercado Pago Developer Account
-- Twilio Account with WhatsApp enabled
+- Twilio Account with WhatsApp
 
 ### Installation
 
@@ -75,120 +105,123 @@ src/
 git clone https://github.com/francopetruu/psico-pay.git
 cd psico-pay
 
+# Install pnpm if needed
+npm install -g pnpm
+
 # Install dependencies
-npm install
+pnpm install
 
-# Copy environment template
-cp .env.example .env
+# Copy environment templates
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
 
-# Configure your credentials in .env
+# Configure your credentials in .env files
 
-# Generate database migration
-npm run db:generate
+# Apply database schema
+pnpm db:push
 
-# Apply migration to database
-npm run db:push
+# Start development (all apps)
+pnpm dev
 
-# Start development server
-npm run dev
+# Or start individually
+pnpm dev:api   # API on port 3000
+pnpm dev:web   # Dashboard on port 3001
 ```
 
-### External Services Setup
+### Create Admin User
 
-#### Google Calendar API
-1. Create project at [Google Cloud Console](https://console.cloud.google.com/)
-2. Enable Google Calendar API
-3. Create OAuth 2.0 credentials
-4. Generate refresh token using OAuth playground
-5. Add credentials to `.env`
-
-#### Mercado Pago
-1. Create developer account at [Mercado Pago Developers](https://www.mercadopago.com.ar/developers/)
-2. Get sandbox/production credentials
-3. Configure webhook URL: `https://yourdomain.com/webhook/mercadopago`
-4. Add credentials to `.env`
-
-#### Twilio WhatsApp
-1. Create account at [Twilio](https://www.twilio.com/)
-2. Enable WhatsApp sandbox or production number
-3. Join sandbox (for development): Send "join [keyword]" to sandbox number
-4. Add credentials to `.env`
-
-### Calendar Event Format
-
-Events must follow this format to be detected:
-- **Title**: `Sesión - Patient Name` (case insensitive)
-- **Description**: Include patient phone in E.164 format (+5491112345678)
-- **Google Meet**: Must have Meet link enabled
-- **Duration**: 30-90 minutes
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Health check |
-| POST | `/webhook/mercadopago` | Payment webhook |
-| GET | `/payment/success` | Payment success redirect |
-| GET | `/payment/failure` | Payment failure redirect |
-| GET | `/payment/pending` | Payment pending redirect |
+```bash
+cd apps/web
+pnpm create-admin admin@psicopay.com yourpassword "Admin Name"
+```
 
 ## Development
 
 ```bash
 # Development with hot reload
-npm run dev
+pnpm dev
 
-# Build for production
-npm run build
+# Build all packages
+pnpm build
 
-# Start production server
-npm start
+# Build specific package
+pnpm build:api
+pnpm build:web
 
 # Database management
-npm run db:generate  # Generate migration
-npm run db:push      # Apply schema
-npm run db:studio    # Visual DB browser
+pnpm db:generate  # Generate migration
+pnpm db:push      # Apply schema
+pnpm db:studio    # Visual DB browser
+
+# Linting
+pnpm lint
 ```
+
+## Dashboard Features
+
+### Sessions
+- View all scheduled and completed sessions
+- Filter by status, payment status, date
+- Mark sessions as paid, completed, or cancelled
+
+### Patients
+- Patient directory with search
+- Contact information and session history
+- Total sessions and payments per patient
+
+### Payments
+- Monthly payment statistics
+- Payment history with filtering
+- Collection rate metrics
+
+### Reports
+- Revenue trends over time
+- Payment status distribution (pie chart)
+- Monthly revenue (line chart)
+- Top patients by revenue
 
 ## Environment Variables
 
-See [.env.example](./.env.example) for all required variables:
+### API (.env)
+- `DATABASE_URL` - PostgreSQL connection string
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`
+- `MP_ACCESS_TOKEN`, `MP_PUBLIC_KEY`, `MP_WEBHOOK_SECRET`
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER`
+- `PORT`, `APP_URL`, `SESSION_PRICE`, `CRON_SCHEDULE`
 
-- **Database**: `DATABASE_URL`
-- **Google**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`
-- **Mercado Pago**: `MP_ACCESS_TOKEN`, `MP_PUBLIC_KEY`, `MP_WEBHOOK_SECRET`
-- **Twilio**: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER`
-- **App**: `PORT`, `APP_URL`, `SESSION_PRICE`, `CRON_SCHEDULE`
-
-## Documentation
-
-- [Phase 1 MVP Specification](./PHASE%201%20MVP.md) - Complete technical spec
-- [Branching Strategy](./BRANCHING_STRATEGY.md) - Git workflow
-- [Changelog](./CHANGELOG.md) - Version history
-
-### Module Documentation
-- [Database Schema](./src/db/README.md)
-- [Services](./src/services/README.md)
-- [Repositories](./src/repositories/README.md)
-- [Jobs](./src/jobs/README.md)
-- [Routes](./src/routes/README.md)
+### Web (.env)
+- `DATABASE_URL` - PostgreSQL connection string
+- `AUTH_SECRET` - NextAuth secret (generate with `openssl rand -base64 32`)
+- `AUTH_URL` - Dashboard URL (http://localhost:3001)
 
 ## Deployment
 
-### Railway/Render (Recommended)
-1. Connect GitHub repository
-2. Set environment variables
-3. Configure PostgreSQL add-on
+### Vercel (Dashboard)
+1. Import the repository to Vercel
+2. Set root directory to `apps/web`
+3. Configure environment variables
 4. Deploy
 
-### Manual (VPS)
+### Fly.io (API)
+See [Fly.io deployment guide](./apps/api/README.md)
+
+### Manual
 ```bash
 # Build
-npm run build
+pnpm build
 
-# Start with PM2
-pm2 start dist/index.js --name psico-pay
+# Start API with PM2
+cd apps/api && pm2 start dist/index.js --name psico-pay-api
+
+# Dashboard (use Vercel or similar)
 ```
+
+## Documentation
+
+- [Phase 1 MVP Specification](./PHASE%201%20MVP.md)
+- [Phase 2 Dashboard Specification](./PHASE%202%20Dashboard%20%26%20Management%20Syst.md)
+- [Branching Strategy](./BRANCHING_STRATEGY.md)
+- [Changelog](./CHANGELOG.md)
 
 ## License
 

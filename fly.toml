@@ -7,7 +7,7 @@ app = 'psico-pay'
 primary_region = 'gru'
 
 [build]
-  dockerfile = 'Dockerfile'
+  dockerfile = 'apps/api/Dockerfile'
 
 [env]
   NODE_ENV = 'production'

@@ -1,62 +1,43 @@
 {
-  "name": "psico-pay",
-  "version": "0.1.0",
-  "description": "Automated payment collection system for remote therapy sessions",
-  "main": "dist/index.js",
+  "name": "psico-pay-monorepo",
+  "version": "0.2.0",
+  "private": true,
+  "description": "PsicoPay - Automated payment collection system for remote therapy sessions",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest watch",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "dev": "turbo run dev",
+    "dev:api": "turbo run dev --filter=@psico-pay/api",
+    "dev:web": "turbo run dev --filter=@psico-pay/web",
+    "build": "turbo run build",
+    "build:api": "turbo run build --filter=@psico-pay/api",
+    "build:web": "turbo run build --filter=@psico-pay/web",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:run": "turbo run test:run",
+    "db:generate": "pnpm --filter @psico-pay/db db:generate",
+    "db:migrate": "pnpm --filter @psico-pay/db db:migrate",
+    "db:push": "pnpm --filter @psico-pay/db db:push",
+    "db:studio": "pnpm --filter @psico-pay/db db:studio",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\""
   },
   "keywords": [
     "therapy",
     "payments",
     "automation",
     "mercadopago",
-    "whatsapp"
+    "whatsapp",
+    "monorepo",
+    "turborepo"
   ],
   "author": "francopetruu",
   "license": "MIT",
   "engines": {
     "node": ">=20.0.0"
   },
-  "dependencies": {
-    "date-fns": "^3.6.0",
-    "dotenv": "^16.4.5",
-    "drizzle-orm": "^0.38.3",
-    "express": "^4.21.2",
-    "googleapis": "^144.0.0",
-    "mercadopago": "^2.0.15",
-    "node-cron": "^3.0.3",
-    "pg": "^8.13.1",
-    "pino": "^9.6.0",
-    "pino-pretty": "^13.0.0",
-    "twilio": "^5.4.0",
-    "zod": "^3.24.1"
-  },
+  "packageManager": "pnpm@9.15.0",
   "devDependencies": {
-    "@types/express": "^5.0.0",
-    "@types/node": "^22.10.6",
-    "@types/node-cron": "^3.0.11",
-    "@types/pg": "^8.11.10",
-    "@typescript-eslint/eslint-plugin": "^8.20.0",
-    "@typescript-eslint/parser": "^8.20.0",
-    "@vitest/coverage-v8": "^2.1.8",
-    "drizzle-kit": "^0.30.2",
-    "eslint": "^9.18.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.3",
-    "vitest": "^2.1.8"
+    "turbo": "^2.3.0",
+    "prettier": "^3.4.2"
   }
 }
