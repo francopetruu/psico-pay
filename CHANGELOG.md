@@ -11,6 +11,27 @@ Nothing yet.
 
 ---
 
+## [0.1.1] - 2026-01-20
+
+### Added
+
+#### Deployment
+- Docker configuration for containerized deployment
+- Fly.io configuration (São Paulo region, always-on)
+- Production deployment at https://psico-pay.fly.dev
+
+#### Admin Scripts
+- `scripts/reset-reminder.ts`: Reset reminder flags for re-sending
+- `scripts/send-reminder-now.ts`: Manual reminder outside time window
+- `scripts/send-new-payment-link.ts`: Regenerate payment links
+- `scripts/confirm-payment-manually.ts`: Manual payment confirmation
+- `scripts/README.md`: Script documentation
+
+### Fixed
+- TypeScript strict mode compilation errors (unused imports/params)
+
+---
+
 ## [0.1.0] - 2025-01-18
 
 ### Added
@@ -82,4 +103,5 @@ Nothing yet.
 
 ## Version History
 
+- **0.1.1** - Production deployment (Fly.io) and admin scripts
 - **0.1.0** - Initial MVP release (Phase 1)
