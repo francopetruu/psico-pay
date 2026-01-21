@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   users,
+  therapists,
+  oauthTokens,
   patients,
   sessions,
   paymentPreferences,
@@ -14,6 +16,7 @@ import {
   notificationStatusEnum,
   userRoleEnum,
   auditActionEnum,
+  oauthProviderEnum,
 } from './index.js';
 
 describe('Database Schema', () => {
@@ -68,6 +71,10 @@ describe('Database Schema', () => {
     it('should have correct audit action values', () => {
       expect(auditActionEnum.enumValues).toEqual(['create', 'update', 'delete']);
     });
+
+    it('should have correct oauth provider values', () => {
+      expect(oauthProviderEnum.enumValues).toEqual(['google']);
+    });
   });
 
   describe('Tables', () => {
@@ -83,9 +90,50 @@ describe('Database Schema', () => {
       expect(columns).toContain('updatedAt');
     });
 
+    it('therapists table should have required columns', () => {
+      const columns = Object.keys(therapists);
+      expect(columns).toContain('id');
+      expect(columns).toContain('googleId');
+      expect(columns).toContain('email');
+      expect(columns).toContain('name');
+      expect(columns).toContain('profilePictureUrl');
+      expect(columns).toContain('bio');
+      expect(columns).toContain('specializations');
+      expect(columns).toContain('credentials');
+      expect(columns).toContain('experienceYears');
+      expect(columns).toContain('therapeuticApproaches');
+      expect(columns).toContain('languages');
+      expect(columns).toContain('defaultSessionPrice');
+      expect(columns).toContain('defaultSessionDuration');
+      expect(columns).toContain('currency');
+      expect(columns).toContain('timezone');
+      expect(columns).toContain('googleCalendarId');
+      expect(columns).toContain('isActive');
+      expect(columns).toContain('onboardingCompleted');
+      expect(columns).toContain('slug');
+      expect(columns).toContain('userId');
+      expect(columns).toContain('createdAt');
+      expect(columns).toContain('updatedAt');
+      expect(columns).toContain('lastLoginAt');
+    });
+
+    it('oauthTokens table should have required columns', () => {
+      const columns = Object.keys(oauthTokens);
+      expect(columns).toContain('id');
+      expect(columns).toContain('therapistId');
+      expect(columns).toContain('provider');
+      expect(columns).toContain('accessToken');
+      expect(columns).toContain('refreshToken');
+      expect(columns).toContain('expiresAt');
+      expect(columns).toContain('scope');
+      expect(columns).toContain('createdAt');
+      expect(columns).toContain('updatedAt');
+    });
+
     it('patients table should have required columns', () => {
       const columns = Object.keys(patients);
       expect(columns).toContain('id');
+      expect(columns).toContain('therapistId');
       expect(columns).toContain('name');
       expect(columns).toContain('phone');
       expect(columns).toContain('email');
@@ -98,6 +146,7 @@ describe('Database Schema', () => {
     it('sessions table should have required columns', () => {
       const columns = Object.keys(sessions);
       expect(columns).toContain('id');
+      expect(columns).toContain('therapistId');
       expect(columns).toContain('patientId');
       expect(columns).toContain('calendarEventId');
       expect(columns).toContain('scheduledAt');

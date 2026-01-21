@@ -59,6 +59,10 @@ export const auditActionEnum = pgEnum('audit_action', [
   'delete',
 ]);
 
+export const oauthProviderEnum = pgEnum('oauth_provider', [
+  'google',
+]);
+
 // Users table (for dashboard authentication)
 export const users = pgTable(
   'users',
@@ -83,13 +87,98 @@ export const users = pgTable(
   ]
 );
 
+// Therapists table (multi-tenant root)
+export const therapists = pgTable(
+  'therapists',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    // Google OAuth
+    googleId: varchar('google_id', { length: 255 }).unique(),
+    email: varchar('email', { length: 255 }).notNull().unique(),
+    name: varchar('name', { length: 255 }).notNull(),
+    profilePictureUrl: text('profile_picture_url'),
+
+    // Professional info
+    bio: text('bio'),
+    specializations: text('specializations').array(),
+    credentials: jsonb('credentials'), // {degrees: [], certifications: []}
+    experienceYears: integer('experience_years'),
+    therapeuticApproaches: text('therapeutic_approaches').array(),
+    languages: text('languages').array(),
+
+    // Business settings
+    defaultSessionPrice: decimal('default_session_price', { precision: 10, scale: 2 }).notNull().default('15000'),
+    defaultSessionDuration: integer('default_session_duration').notNull().default(50),
+    currency: varchar('currency', { length: 3 }).notNull().default('ARS'),
+    timezone: varchar('timezone', { length: 50 }).notNull().default('America/Argentina/Buenos_Aires'),
+
+    // Calendar configuration
+    googleCalendarId: varchar('google_calendar_id', { length: 255 }),
+
+    // Status
+    isActive: boolean('is_active').notNull().default(true),
+    onboardingCompleted: boolean('onboarding_completed').notNull().default(false),
+
+    // Public URL slug
+    slug: varchar('slug', { length: 100 }).unique(),
+
+    // Linked user account (for credentials login)
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+
+    // Metadata
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('therapists_email_idx').on(table.email),
+    uniqueIndex('therapists_google_id_idx').on(table.googleId),
+    uniqueIndex('therapists_slug_idx').on(table.slug),
+    index('therapists_user_id_idx').on(table.userId),
+  ]
+);
+
+// OAuth tokens table (for storing refresh tokens)
+export const oauthTokens = pgTable(
+  'oauth_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    therapistId: uuid('therapist_id')
+      .notNull()
+      .references(() => therapists.id, { onDelete: 'cascade' }),
+    provider: oauthProviderEnum('provider').notNull(),
+    accessToken: text('access_token').notNull(),
+    refreshToken: text('refresh_token').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    scope: text('scope'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex('oauth_tokens_therapist_provider_idx').on(table.therapistId, table.provider),
+  ]
+);
+
 // Patients table
 export const patients = pgTable(
   'patients',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    // Multi-tenant: therapist_id is nullable for backward compatibility
+    therapistId: uuid('therapist_id')
+      .references(() => therapists.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 255 }).notNull(),
-    phone: varchar('phone', { length: 20 }).notNull().unique(),
+    phone: varchar('phone', { length: 20 }).notNull(),
     email: varchar('email', { length: 255 }),
     trusted: boolean('trusted').notNull().default(false),
     notes: text('notes'),
@@ -105,7 +194,9 @@ export const patients = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
-    uniqueIndex('patients_phone_idx').on(table.phone),
+    // Phone is unique per therapist, not globally
+    uniqueIndex('patients_therapist_phone_idx').on(table.therapistId, table.phone),
+    index('patients_therapist_id_idx').on(table.therapistId),
     index('patients_name_idx').on(table.name),
     index('patients_last_session_at_idx').on(table.lastSessionAt),
   ]
@@ -116,6 +207,9 @@ export const sessions = pgTable(
   'sessions',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    // Multi-tenant: therapist_id is nullable for backward compatibility
+    therapistId: uuid('therapist_id')
+      .references(() => therapists.id, { onDelete: 'cascade' }),
     patientId: uuid('patient_id')
       .notNull()
       .references(() => patients.id, { onDelete: 'cascade' }),
@@ -147,10 +241,12 @@ export const sessions = pgTable(
   },
   (table) => [
     uniqueIndex('sessions_calendar_event_id_idx').on(table.calendarEventId),
+    index('sessions_therapist_id_idx').on(table.therapistId),
     index('sessions_patient_id_idx').on(table.patientId),
     index('sessions_scheduled_at_idx').on(table.scheduledAt),
     index('sessions_payment_status_idx').on(table.paymentStatus),
     index('sessions_status_idx').on(table.status),
+    index('sessions_therapist_scheduled_idx').on(table.therapistId, table.scheduledAt),
   ]
 );
 
@@ -254,16 +350,45 @@ export const auditLog = pgTable(
 );
 
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
   sessionNotes: many(sessionNotes),
   auditLogs: many(auditLog),
+  therapist: one(therapists, {
+    fields: [users.id],
+    references: [therapists.userId],
+  }),
 }));
 
-export const patientsRelations = relations(patients, ({ many }) => ({
+export const therapistsRelations = relations(therapists, ({ one, many }) => ({
+  user: one(users, {
+    fields: [therapists.userId],
+    references: [users.id],
+  }),
+  patients: many(patients),
+  sessions: many(sessions),
+  oauthTokens: many(oauthTokens),
+}));
+
+export const oauthTokensRelations = relations(oauthTokens, ({ one }) => ({
+  therapist: one(therapists, {
+    fields: [oauthTokens.therapistId],
+    references: [therapists.id],
+  }),
+}));
+
+export const patientsRelations = relations(patients, ({ one, many }) => ({
+  therapist: one(therapists, {
+    fields: [patients.therapistId],
+    references: [therapists.id],
+  }),
   sessions: many(sessions),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one, many }) => ({
+  therapist: one(therapists, {
+    fields: [sessions.therapistId],
+    references: [therapists.id],
+  }),
   patient: one(patients, {
     fields: [sessions.patientId],
     references: [patients.id],
@@ -314,6 +439,12 @@ export const auditLogRelations = relations(auditLog, ({ one }) => ({
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+
+export type Therapist = typeof therapists.$inferSelect;
+export type NewTherapist = typeof therapists.$inferInsert;
+
+export type OAuthToken = typeof oauthTokens.$inferSelect;
+export type NewOAuthToken = typeof oauthTokens.$inferInsert;
 
 export type Patient = typeof patients.$inferSelect;
 export type NewPatient = typeof patients.$inferInsert;
