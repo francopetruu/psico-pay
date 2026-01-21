@@ -148,14 +148,51 @@ pnpm build
 pnpm build:api
 pnpm build:web
 
+# Type checking
+pnpm typecheck
+
+# Linting
+pnpm lint
+
+# Testing
+pnpm test         # Run tests in watch mode
+pnpm test:run     # Run tests once
+pnpm test:coverage # Run tests with coverage
+
 # Database management
 pnpm db:generate  # Generate migration
 pnpm db:push      # Apply schema
 pnpm db:studio    # Visual DB browser
-
-# Linting
-pnpm lint
 ```
+
+## CI/CD
+
+This project uses GitHub Actions for continuous integration and Vercel for deployment.
+
+### GitHub Actions Workflow
+
+The CI pipeline runs on every push to `main` and on all pull requests:
+
+| Job | Description |
+|-----|-------------|
+| **Lint** | Runs ESLint on all packages |
+| **Type Check** | Runs TypeScript type checking |
+| **Test** | Runs all unit tests with Vitest |
+| **Build** | Builds all packages (runs after lint, typecheck, and test pass) |
+
+### Vercel Deployment
+
+- **Production**: Auto-deploys when changes are merged to `main`
+- **Preview**: Auto-deploys for every pull request
+- **Configuration**: Monorepo setup with `apps/web` as root directory
+
+### CI Status
+
+Pull requests require all CI checks to pass before merging:
+- Lint must pass
+- Type check must pass
+- All tests must pass
+- Build must succeed
 
 ## Dashboard Features
 

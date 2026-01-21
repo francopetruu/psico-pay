@@ -11,6 +11,99 @@ Nothing yet.
 
 ---
 
+## [0.2.1] - 2026-01-21
+
+### Added
+
+#### CI/CD Pipeline
+- GitHub Actions workflow for continuous integration
+  - Lint job: ESLint across all packages
+  - Type check job: TypeScript strict mode
+  - Test job: Vitest unit tests
+  - Build job: Full monorepo build (requires all checks to pass)
+- Automatic checks on push to main and pull requests
+
+#### Testing Infrastructure
+- Vitest configuration for `@psico-pay/web`
+- Vitest configuration for `@psico-pay/db`
+- React Testing Library integration
+- Test setup with Next.js and NextAuth mocks
+- Sample tests for utilities and schema
+
+#### Documentation
+- Updated root README with CI/CD section
+- Comprehensive README for `apps/web` module
+- Comprehensive README for `packages/db` module
+- Testing documentation
+
+#### New Scripts
+- `pnpm typecheck` - TypeScript type checking
+- `pnpm test:coverage` - Tests with coverage report
+
+### Changed
+- Updated turbo.json with test and typecheck pipelines
+- Added test dependencies to web and db packages
+
+---
+
+## [0.2.0] - 2026-01-20
+
+### Added
+
+#### Monorepo Structure
+- pnpm workspaces + Turborepo configuration
+- Shared `@psico-pay/db` package for database schemas
+- Apps structure: `apps/api` (existing), `apps/web` (new)
+
+#### Dashboard (Next.js 14)
+- Full management dashboard for therapists
+- Authentication with NextAuth.js v5 (email/password)
+- Protected routes via middleware
+
+#### Sessions Module
+- List all sessions with filtering (status, payment, date)
+- Session detail view with actions
+- Mark sessions as paid, completed, or cancelled
+- Add session notes
+
+#### Patients Module
+- Patient directory with search
+- Create, edit, delete patients
+- Patient profile with session history
+- Contact information management
+
+#### Payments Module
+- Monthly payment statistics dashboard
+- Payment history with filtering
+- Collection rate metrics
+- Manual payment registration
+
+#### Reports Module
+- Revenue trends (line chart)
+- Payment status distribution (pie chart)
+- Monthly revenue breakdown
+- Top patients by revenue
+- Export to CSV functionality
+
+#### Database Schema Extensions
+- `users` table for dashboard authentication
+- `session_notes` table for session annotations
+- `audit_log` table for change tracking
+- Extended `sessions` table (status, cancellation fields)
+- Extended `patients` table (notes, statistics)
+
+#### Tech Stack Additions
+- tRPC for type-safe API routes
+- TanStack Query for data fetching
+- shadcn/ui component library
+- Recharts for analytics
+- bcrypt for password hashing
+
+### Fixed
+- Package exports for @psico-pay/db CommonJS compatibility
+
+---
+
 ## [0.1.1] - 2026-01-20
 
 ### Added
@@ -103,5 +196,7 @@ Nothing yet.
 
 ## Version History
 
+- **0.2.1** - CI/CD pipeline, testing infrastructure, documentation
+- **0.2.0** - Phase 2: Dashboard & Management System
 - **0.1.1** - Production deployment (Fly.io) and admin scripts
 - **0.1.0** - Initial MVP release (Phase 1)
