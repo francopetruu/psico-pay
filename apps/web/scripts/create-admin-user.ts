@@ -1,4 +1,4 @@
-import { hash } from "bcrypt";
+import { hash } from "bcryptjs";
 import { createDb, users } from "@psico-pay/db";
 import { closePool } from "@psico-pay/db";
 

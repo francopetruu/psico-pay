@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { compare } from "bcrypt";
+import { compare } from "bcryptjs";
 import { getDb } from "@/lib/db";
 import { users } from "@psico-pay/db/schema";
 import { eq } from "drizzle-orm";
