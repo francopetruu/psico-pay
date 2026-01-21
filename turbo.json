@@ -12,8 +12,20 @@
     "lint": {
       "dependsOn": ["^build"]
     },
-    "test": {
+    "typecheck": {
       "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "test:run": {
+      "dependsOn": ["^build"]
+    },
+    "test:coverage": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
     },
     "db:generate": {
       "cache": false
