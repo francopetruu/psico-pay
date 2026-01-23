@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../trpc";
+import { router, therapistProcedure } from "../trpc";
 import { sessions, patients } from "@psico-pay/db/schema";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 import { startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 
 export const reportsRouter = router({
-  overview: protectedProcedure
+  overview: therapistProcedure
     .input(
       z.object({
         months: z.number().min(1).max(12).default(3),
@@ -16,6 +16,12 @@ export const reportsRouter = router({
       const startDate = startOfMonth(subMonths(now, input.months - 1));
       const endDate = endOfMonth(now);
 
+      const baseConditions = [
+        eq(sessions.therapistId, ctx.therapistId),
+        gte(sessions.scheduledAt, startDate),
+        lte(sessions.scheduledAt, endDate),
+      ];
+
       // Total revenue for the period
       const revenueResult = await ctx.db
         .select({
@@ -24,9 +30,8 @@ export const reportsRouter = router({
         .from(sessions)
         .where(
           and(
-            eq(sessions.paymentStatus, "paid"),
-            gte(sessions.scheduledAt, startDate),
-            lte(sessions.scheduledAt, endDate)
+            ...baseConditions,
+            eq(sessions.paymentStatus, "paid")
           )
         );
 
@@ -38,9 +43,8 @@ export const reportsRouter = router({
         .from(sessions)
         .where(
           and(
-            eq(sessions.status, "completed"),
-            gte(sessions.scheduledAt, startDate),
-            lte(sessions.scheduledAt, endDate)
+            ...baseConditions,
+            eq(sessions.status, "completed")
           )
         );
 
@@ -52,9 +56,8 @@ export const reportsRouter = router({
         .from(sessions)
         .where(
           and(
-            eq(sessions.status, "cancelled"),
-            gte(sessions.scheduledAt, startDate),
-            lte(sessions.scheduledAt, endDate)
+            ...baseConditions,
+            eq(sessions.status, "cancelled")
           )
         );
 
@@ -64,12 +67,7 @@ export const reportsRouter = router({
           count: sql<number>`COUNT(*)`,
         })
         .from(sessions)
-        .where(
-          and(
-            gte(sessions.scheduledAt, startDate),
-            lte(sessions.scheduledAt, endDate)
-          )
-        );
+        .where(and(...baseConditions));
 
       const totalRevenue = Number(revenueResult[0]?.total ?? 0);
       const completedCount = Number(completedResult[0]?.count ?? 0);
@@ -92,7 +90,7 @@ export const reportsRouter = router({
       };
     }),
 
-  revenueByMonth: protectedProcedure
+  revenueByMonth: therapistProcedure
     .input(
       z.object({
         months: z.number().min(1).max(12).default(6),
@@ -114,6 +112,7 @@ export const reportsRouter = router({
           .from(sessions)
           .where(
             and(
+              eq(sessions.therapistId, ctx.therapistId),
               eq(sessions.paymentStatus, "paid"),
               gte(sessions.scheduledAt, monthStart),
               lte(sessions.scheduledAt, monthEnd)
@@ -130,7 +129,7 @@ export const reportsRouter = router({
       return monthlyData;
     }),
 
-  paymentStatusDistribution: protectedProcedure
+  paymentStatusDistribution: therapistProcedure
     .input(
       z.object({
         from: z.date().optional(),
@@ -138,7 +137,7 @@ export const reportsRouter = router({
       }).default({})
     )
     .query(async ({ ctx, input }) => {
-      const conditions = [];
+      const conditions = [eq(sessions.therapistId, ctx.therapistId)];
 
       if (input.from) {
         conditions.push(gte(sessions.scheduledAt, input.from));
@@ -147,7 +146,7 @@ export const reportsRouter = router({
         conditions.push(lte(sessions.scheduledAt, input.to));
       }
 
-      const baseWhere = conditions.length > 0 ? and(...conditions) : undefined;
+      const baseWhere = and(...conditions);
 
       const statuses = ["paid", "pending", "failed", "refunded"] as const;
       const distribution = [];
@@ -159,11 +158,7 @@ export const reportsRouter = router({
             total: sql<string>`COALESCE(SUM(${sessions.amount}), 0)`,
           })
           .from(sessions)
-          .where(
-            baseWhere
-              ? and(baseWhere, eq(sessions.paymentStatus, status))
-              : eq(sessions.paymentStatus, status)
-          );
+          .where(and(baseWhere, eq(sessions.paymentStatus, status)));
 
         distribution.push({
           status,
@@ -175,7 +170,7 @@ export const reportsRouter = router({
       return distribution;
     }),
 
-  topPatients: protectedProcedure
+  topPatients: therapistProcedure
     .input(
       z.object({
         limit: z.number().min(1).max(20).default(10),
@@ -184,7 +179,10 @@ export const reportsRouter = router({
       }).default({})
     )
     .query(async ({ ctx, input }) => {
-      const conditions = [eq(sessions.paymentStatus, "paid")];
+      const conditions = [
+        eq(sessions.therapistId, ctx.therapistId),
+        eq(sessions.paymentStatus, "paid"),
+      ];
 
       if (input.from) {
         conditions.push(gte(sessions.scheduledAt, input.from));
