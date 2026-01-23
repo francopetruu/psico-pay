@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../trpc";
+import { router, therapistProcedure } from "../trpc";
 import { sessions, patients, notifications } from "@psico-pay/db/schema";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 
 export const sessionsRouter = router({
-  list: protectedProcedure
+  list: therapistProcedure
     .input(
       z.object({
         limit: z.number().min(1).max(100).default(20),
@@ -17,7 +17,7 @@ export const sessionsRouter = router({
       }).default({})
     )
     .query(async ({ ctx, input }) => {
-      const conditions = [];
+      const conditions = [eq(sessions.therapistId, ctx.therapistId)];
 
       if (input.status) {
         conditions.push(eq(sessions.status, input.status));
@@ -35,7 +35,7 @@ export const sessionsRouter = router({
         conditions.push(lte(sessions.scheduledAt, input.to));
       }
 
-      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      const whereClause = and(...conditions);
 
       const [sessionList, countResult] = await Promise.all([
         ctx.db
@@ -73,7 +73,7 @@ export const sessionsRouter = router({
       };
     }),
 
-  getById: protectedProcedure
+  getById: therapistProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const session = await ctx.db
@@ -102,7 +102,12 @@ export const sessionsRouter = router({
         })
         .from(sessions)
         .leftJoin(patients, eq(sessions.patientId, patients.id))
-        .where(eq(sessions.id, input.id))
+        .where(
+          and(
+            eq(sessions.id, input.id),
+            eq(sessions.therapistId, ctx.therapistId)
+          )
+        )
         .limit(1);
 
       if (session.length === 0) {
@@ -122,7 +127,7 @@ export const sessionsRouter = router({
       };
     }),
 
-  markAsPaid: protectedProcedure
+  markAsPaid: therapistProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
@@ -131,12 +136,17 @@ export const sessionsRouter = router({
           paymentStatus: "paid",
           paymentId: `MANUAL-${Date.now()}`,
         })
-        .where(eq(sessions.id, input.id));
+        .where(
+          and(
+            eq(sessions.id, input.id),
+            eq(sessions.therapistId, ctx.therapistId)
+          )
+        );
 
       return { success: true };
     }),
 
-  cancel: protectedProcedure
+  cancel: therapistProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -151,12 +161,17 @@ export const sessionsRouter = router({
           cancellationReason: input.reason,
           cancelledAt: new Date(),
         })
-        .where(eq(sessions.id, input.id));
+        .where(
+          and(
+            eq(sessions.id, input.id),
+            eq(sessions.therapistId, ctx.therapistId)
+          )
+        );
 
       return { success: true };
     }),
 
-  markAsCompleted: protectedProcedure
+  markAsCompleted: therapistProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
@@ -165,7 +180,12 @@ export const sessionsRouter = router({
           status: "completed",
           completedAt: new Date(),
         })
-        .where(eq(sessions.id, input.id));
+        .where(
+          and(
+            eq(sessions.id, input.id),
+            eq(sessions.therapistId, ctx.therapistId)
+          )
+        );
 
       return { success: true };
     }),

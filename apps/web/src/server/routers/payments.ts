@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../trpc";
+import { router, therapistProcedure } from "../trpc";
 import { sessions, patients, paymentPreferences } from "@psico-pay/db/schema";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 
 export const paymentsRouter = router({
-  list: protectedProcedure
+  list: therapistProcedure
     .input(
       z.object({
         limit: z.number().min(1).max(100).default(20),
@@ -15,7 +15,7 @@ export const paymentsRouter = router({
       }).default({})
     )
     .query(async ({ ctx, input }) => {
-      const conditions = [];
+      const conditions = [eq(sessions.therapistId, ctx.therapistId)];
 
       if (input.status) {
         conditions.push(eq(sessions.paymentStatus, input.status));
@@ -27,7 +27,7 @@ export const paymentsRouter = router({
         conditions.push(lte(sessions.scheduledAt, input.to));
       }
 
-      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      const whereClause = and(...conditions);
 
       const [paymentList, countResult] = await Promise.all([
         ctx.db
@@ -62,7 +62,7 @@ export const paymentsRouter = router({
       };
     }),
 
-  getById: protectedProcedure
+  getById: therapistProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const payment = await ctx.db
@@ -83,7 +83,12 @@ export const paymentsRouter = router({
         })
         .from(sessions)
         .leftJoin(patients, eq(sessions.patientId, patients.id))
-        .where(eq(sessions.id, input.id))
+        .where(
+          and(
+            eq(sessions.id, input.id),
+            eq(sessions.therapistId, ctx.therapistId)
+          )
+        )
         .limit(1);
 
       if (payment.length === 0) {
@@ -103,7 +108,7 @@ export const paymentsRouter = router({
       };
     }),
 
-  stats: protectedProcedure
+  stats: therapistProcedure
     .input(
       z.object({
         from: z.date().optional(),
@@ -111,7 +116,7 @@ export const paymentsRouter = router({
       }).default({})
     )
     .query(async ({ ctx, input }) => {
-      const conditions = [];
+      const conditions = [eq(sessions.therapistId, ctx.therapistId)];
 
       if (input.from) {
         conditions.push(gte(sessions.scheduledAt, input.from));
@@ -120,7 +125,7 @@ export const paymentsRouter = router({
         conditions.push(lte(sessions.scheduledAt, input.to));
       }
 
-      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      const baseWhere = and(...conditions);
 
       // Total paid
       const paidResult = await ctx.db
@@ -129,11 +134,7 @@ export const paymentsRouter = router({
           count: sql<number>`COUNT(*)`,
         })
         .from(sessions)
-        .where(
-          whereClause
-            ? and(whereClause, eq(sessions.paymentStatus, "paid"))
-            : eq(sessions.paymentStatus, "paid")
-        );
+        .where(and(baseWhere, eq(sessions.paymentStatus, "paid")));
 
       // Total pending
       const pendingResult = await ctx.db
@@ -142,11 +143,7 @@ export const paymentsRouter = router({
           count: sql<number>`COUNT(*)`,
         })
         .from(sessions)
-        .where(
-          whereClause
-            ? and(whereClause, eq(sessions.paymentStatus, "pending"))
-            : eq(sessions.paymentStatus, "pending")
-        );
+        .where(and(baseWhere, eq(sessions.paymentStatus, "pending")));
 
       // Total sessions
       const totalResult = await ctx.db
@@ -154,7 +151,7 @@ export const paymentsRouter = router({
           count: sql<number>`COUNT(*)`,
         })
         .from(sessions)
-        .where(whereClause);
+        .where(baseWhere);
 
       const totalPaid = Number(paidResult[0]?.total ?? 0);
       const totalPending = Number(pendingResult[0]?.total ?? 0);
@@ -174,7 +171,7 @@ export const paymentsRouter = router({
       };
     }),
 
-  registerManual: protectedProcedure
+  registerManual: therapistProcedure
     .input(
       z.object({
         sessionId: z.string().uuid(),
@@ -191,7 +188,12 @@ export const paymentsRouter = router({
           paymentStatus: "paid",
           paymentId,
         })
-        .where(eq(sessions.id, input.sessionId));
+        .where(
+          and(
+            eq(sessions.id, input.sessionId),
+            eq(sessions.therapistId, ctx.therapistId)
+          )
+        );
 
       return { success: true, paymentId };
     }),

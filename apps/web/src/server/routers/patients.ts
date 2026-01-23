@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../trpc";
+import { router, therapistProcedure } from "../trpc";
 import { patients, sessions } from "@psico-pay/db/schema";
-import { eq, desc, ilike, sql, or } from "drizzle-orm";
+import { eq, desc, ilike, sql, or, and } from "drizzle-orm";
 
 const phoneRegex = /^\+[1-9]\d{1,14}$/;
 
 export const patientsRouter = router({
-  list: protectedProcedure
+  list: therapistProcedure
     .input(
       z.object({
         limit: z.number().min(1).max(100).default(20),
@@ -15,16 +15,20 @@ export const patientsRouter = router({
       }).default({})
     )
     .query(async ({ ctx, input }) => {
-      let whereClause;
+      const conditions = [eq(patients.therapistId, ctx.therapistId)];
 
       if (input.search) {
         const searchTerm = `%${input.search}%`;
-        whereClause = or(
-          ilike(patients.name, searchTerm),
-          ilike(patients.phone, searchTerm),
-          ilike(patients.email, searchTerm)
+        conditions.push(
+          or(
+            ilike(patients.name, searchTerm),
+            ilike(patients.phone, searchTerm),
+            ilike(patients.email, searchTerm)
+          )!
         );
       }
+
+      const whereClause = and(...conditions);
 
       const [patientList, countResult] = await Promise.all([
         ctx.db
@@ -46,13 +50,18 @@ export const patientsRouter = router({
       };
     }),
 
-  getById: protectedProcedure
+  getById: therapistProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const patient = await ctx.db
         .select()
         .from(patients)
-        .where(eq(patients.id, input.id))
+        .where(
+          and(
+            eq(patients.id, input.id),
+            eq(patients.therapistId, ctx.therapistId)
+          )
+        )
         .limit(1);
 
       if (patient.length === 0) {
@@ -69,7 +78,12 @@ export const patientsRouter = router({
           amount: sessions.amount,
         })
         .from(sessions)
-        .where(eq(sessions.patientId, input.id))
+        .where(
+          and(
+            eq(sessions.patientId, input.id),
+            eq(sessions.therapistId, ctx.therapistId)
+          )
+        )
         .orderBy(desc(sessions.scheduledAt))
         .limit(10);
 
@@ -79,7 +93,7 @@ export const patientsRouter = router({
       };
     }),
 
-  create: protectedProcedure
+  create: therapistProcedure
     .input(
       z.object({
         name: z.string().min(2).max(255),
@@ -93,6 +107,7 @@ export const patientsRouter = router({
       const [newPatient] = await ctx.db
         .insert(patients)
         .values({
+          therapistId: ctx.therapistId,
           name: input.name,
           phone: input.phone,
           email: input.email,
@@ -104,7 +119,7 @@ export const patientsRouter = router({
       return newPatient;
     }),
 
-  update: protectedProcedure
+  update: therapistProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -121,16 +136,28 @@ export const patientsRouter = router({
       const [updatedPatient] = await ctx.db
         .update(patients)
         .set(data)
-        .where(eq(patients.id, id))
+        .where(
+          and(
+            eq(patients.id, id),
+            eq(patients.therapistId, ctx.therapistId)
+          )
+        )
         .returning();
 
       return updatedPatient;
     }),
 
-  delete: protectedProcedure
+  delete: therapistProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db.delete(patients).where(eq(patients.id, input.id));
+      await ctx.db
+        .delete(patients)
+        .where(
+          and(
+            eq(patients.id, input.id),
+            eq(patients.therapistId, ctx.therapistId)
+          )
+        );
       return { success: true };
     }),
 });
