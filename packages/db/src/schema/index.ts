@@ -63,6 +63,29 @@ export const oauthProviderEnum = pgEnum('oauth_provider', [
   'google',
 ]);
 
+export const degreeTypeEnum = pgEnum('degree_type', [
+  'bachelor',
+  'master',
+  'phd',
+  'md',
+  'specialist',
+  'other',
+]);
+
+export const languageProficiencyEnum = pgEnum('language_proficiency', [
+  'native',
+  'fluent',
+  'conversational',
+  'basic',
+]);
+
+export const specializationCategoryEnum = pgEnum('specialization_category', [
+  'mental_health',
+  'age_group',
+  'modality',
+  'other',
+]);
+
 // Users table (for dashboard authentication)
 export const users = pgTable(
   'users',
@@ -166,6 +189,160 @@ export const oauthTokens = pgTable(
   },
   (table) => [
     uniqueIndex('oauth_tokens_therapist_provider_idx').on(table.therapistId, table.provider),
+  ]
+);
+
+// Therapeutic approaches reference table
+export const therapeuticApproaches = pgTable(
+  'therapeutic_approaches',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: varchar('name', { length: 100 }).notNull().unique(),
+    description: text('description'),
+    acronym: varchar('acronym', { length: 20 }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  }
+);
+
+// Specializations reference table
+export const specializations = pgTable(
+  'specializations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: varchar('name', { length: 100 }).notNull().unique(),
+    description: text('description'),
+    category: specializationCategoryEnum('category'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  }
+);
+
+// Therapist degrees table
+export const therapistDegrees = pgTable(
+  'therapist_degrees',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    therapistId: uuid('therapist_id')
+      .notNull()
+      .references(() => therapists.id, { onDelete: 'cascade' }),
+    degreeType: degreeTypeEnum('degree_type').notNull(),
+    fieldOfStudy: varchar('field_of_study', { length: 200 }).notNull(),
+    institution: varchar('institution', { length: 255 }).notNull(),
+    graduationYear: integer('graduation_year'),
+    country: varchar('country', { length: 100 }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('therapist_degrees_therapist_id_idx').on(table.therapistId),
+  ]
+);
+
+// Therapist certifications table
+export const therapistCertifications = pgTable(
+  'therapist_certifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    therapistId: uuid('therapist_id')
+      .notNull()
+      .references(() => therapists.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 255 }).notNull(),
+    issuingOrganization: varchar('issuing_organization', { length: 255 }),
+    issueDate: timestamp('issue_date', { withTimezone: true }),
+    expirationDate: timestamp('expiration_date', { withTimezone: true }),
+    credentialId: varchar('credential_id', { length: 100 }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('therapist_certifications_therapist_id_idx').on(table.therapistId),
+  ]
+);
+
+// Therapist work experience table
+export const therapistExperience = pgTable(
+  'therapist_experience',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    therapistId: uuid('therapist_id')
+      .notNull()
+      .references(() => therapists.id, { onDelete: 'cascade' }),
+    position: varchar('position', { length: 200 }).notNull(),
+    organization: varchar('organization', { length: 255 }),
+    startDate: timestamp('start_date', { withTimezone: true }).notNull(),
+    endDate: timestamp('end_date', { withTimezone: true }),
+    description: text('description'),
+    isCurrent: boolean('is_current').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('therapist_experience_therapist_id_idx').on(table.therapistId),
+  ]
+);
+
+// Therapist specializations join table
+export const therapistSpecializations = pgTable(
+  'therapist_specializations',
+  {
+    therapistId: uuid('therapist_id')
+      .notNull()
+      .references(() => therapists.id, { onDelete: 'cascade' }),
+    specializationId: uuid('specialization_id')
+      .notNull()
+      .references(() => specializations.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('therapist_specializations_therapist_id_idx').on(table.therapistId),
+    index('therapist_specializations_specialization_id_idx').on(table.specializationId),
+  ]
+);
+
+// Therapist approaches join table
+export const therapistApproaches = pgTable(
+  'therapist_approaches',
+  {
+    therapistId: uuid('therapist_id')
+      .notNull()
+      .references(() => therapists.id, { onDelete: 'cascade' }),
+    approachId: uuid('approach_id')
+      .notNull()
+      .references(() => therapeuticApproaches.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('therapist_approaches_therapist_id_idx').on(table.therapistId),
+    index('therapist_approaches_approach_id_idx').on(table.approachId),
+  ]
+);
+
+// Therapist languages table
+export const therapistLanguages = pgTable(
+  'therapist_languages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    therapistId: uuid('therapist_id')
+      .notNull()
+      .references(() => therapists.id, { onDelete: 'cascade' }),
+    language: varchar('language', { length: 50 }).notNull(),
+    proficiency: languageProficiencyEnum('proficiency').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('therapist_languages_therapist_id_idx').on(table.therapistId),
   ]
 );
 
@@ -367,11 +544,75 @@ export const therapistsRelations = relations(therapists, ({ one, many }) => ({
   patients: many(patients),
   sessions: many(sessions),
   oauthTokens: many(oauthTokens),
+  degrees: many(therapistDegrees),
+  certifications: many(therapistCertifications),
+  experience: many(therapistExperience),
+  specializations: many(therapistSpecializations),
+  approaches: many(therapistApproaches),
+  languages: many(therapistLanguages),
 }));
 
 export const oauthTokensRelations = relations(oauthTokens, ({ one }) => ({
   therapist: one(therapists, {
     fields: [oauthTokens.therapistId],
+    references: [therapists.id],
+  }),
+}));
+
+export const therapeuticApproachesRelations = relations(therapeuticApproaches, ({ many }) => ({
+  therapistApproaches: many(therapistApproaches),
+}));
+
+export const specializationsRelations = relations(specializations, ({ many }) => ({
+  therapistSpecializations: many(therapistSpecializations),
+}));
+
+export const therapistDegreesRelations = relations(therapistDegrees, ({ one }) => ({
+  therapist: one(therapists, {
+    fields: [therapistDegrees.therapistId],
+    references: [therapists.id],
+  }),
+}));
+
+export const therapistCertificationsRelations = relations(therapistCertifications, ({ one }) => ({
+  therapist: one(therapists, {
+    fields: [therapistCertifications.therapistId],
+    references: [therapists.id],
+  }),
+}));
+
+export const therapistExperienceRelations = relations(therapistExperience, ({ one }) => ({
+  therapist: one(therapists, {
+    fields: [therapistExperience.therapistId],
+    references: [therapists.id],
+  }),
+}));
+
+export const therapistSpecializationsRelations = relations(therapistSpecializations, ({ one }) => ({
+  therapist: one(therapists, {
+    fields: [therapistSpecializations.therapistId],
+    references: [therapists.id],
+  }),
+  specialization: one(specializations, {
+    fields: [therapistSpecializations.specializationId],
+    references: [specializations.id],
+  }),
+}));
+
+export const therapistApproachesRelations = relations(therapistApproaches, ({ one }) => ({
+  therapist: one(therapists, {
+    fields: [therapistApproaches.therapistId],
+    references: [therapists.id],
+  }),
+  approach: one(therapeuticApproaches, {
+    fields: [therapistApproaches.approachId],
+    references: [therapeuticApproaches.id],
+  }),
+}));
+
+export const therapistLanguagesRelations = relations(therapistLanguages, ({ one }) => ({
+  therapist: one(therapists, {
+    fields: [therapistLanguages.therapistId],
     references: [therapists.id],
   }),
 }));
@@ -463,3 +704,27 @@ export type NewSessionNote = typeof sessionNotes.$inferInsert;
 
 export type AuditLog = typeof auditLog.$inferSelect;
 export type NewAuditLog = typeof auditLog.$inferInsert;
+
+export type TherapeuticApproach = typeof therapeuticApproaches.$inferSelect;
+export type NewTherapeuticApproach = typeof therapeuticApproaches.$inferInsert;
+
+export type Specialization = typeof specializations.$inferSelect;
+export type NewSpecialization = typeof specializations.$inferInsert;
+
+export type TherapistDegree = typeof therapistDegrees.$inferSelect;
+export type NewTherapistDegree = typeof therapistDegrees.$inferInsert;
+
+export type TherapistCertification = typeof therapistCertifications.$inferSelect;
+export type NewTherapistCertification = typeof therapistCertifications.$inferInsert;
+
+export type TherapistExperience = typeof therapistExperience.$inferSelect;
+export type NewTherapistExperience = typeof therapistExperience.$inferInsert;
+
+export type TherapistSpecialization = typeof therapistSpecializations.$inferSelect;
+export type NewTherapistSpecialization = typeof therapistSpecializations.$inferInsert;
+
+export type TherapistApproach = typeof therapistApproaches.$inferSelect;
+export type NewTherapistApproach = typeof therapistApproaches.$inferInsert;
+
+export type TherapistLanguage = typeof therapistLanguages.$inferSelect;
+export type NewTherapistLanguage = typeof therapistLanguages.$inferInsert;
