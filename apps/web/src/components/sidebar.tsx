@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
   Home,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ const navigation = [
   { name: "Pacientes", href: "/dashboard/patients", icon: Users },
   { name: "Pagos", href: "/dashboard/payments", icon: CreditCard },
   { name: "Reportes", href: "/dashboard/reports", icon: BarChart3 },
+  { name: "Mi Perfil", href: "/dashboard/profile", icon: User },
 ];
 
 export function Sidebar() {
