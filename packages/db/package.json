@@ -31,7 +31,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "npx tsx scripts/seed-reference-data.ts"
+    "db:seed": "npx tsx scripts/seed-reference-data.ts",
+    "db:check": "npx tsx scripts/check-schema-drift.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.38.3",
