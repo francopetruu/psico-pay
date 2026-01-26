@@ -86,6 +86,12 @@ export const specializationCategoryEnum = pgEnum('specialization_category', [
   'other',
 ]);
 
+export const priceEntityTypeEnum = pgEnum('price_entity_type', [
+  'therapist',
+  'session_type',
+  'patient',
+]);
+
 // Users table (for dashboard authentication)
 export const users = pgTable(
   'users',
@@ -346,6 +352,33 @@ export const therapistLanguages = pgTable(
   ]
 );
 
+// Session types table (for custom pricing per session type)
+export const sessionTypes = pgTable(
+  'session_types',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    therapistId: uuid('therapist_id')
+      .notNull()
+      .references(() => therapists.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 100 }).notNull(),
+    description: text('description'),
+    durationMinutes: integer('duration_minutes').notNull().default(50),
+    price: decimal('price', { precision: 10, scale: 2 }), // NULL = use default price
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex('session_types_therapist_name_idx').on(table.therapistId, table.name),
+    index('session_types_therapist_id_idx').on(table.therapistId),
+  ]
+);
+
 // Patients table
 export const patients = pgTable(
   'patients',
@@ -379,6 +412,60 @@ export const patients = pgTable(
   ]
 );
 
+// Patient-specific pricing overrides
+export const patientPricing = pgTable(
+  'patient_pricing',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'cascade' }),
+    therapistId: uuid('therapist_id')
+      .notNull()
+      .references(() => therapists.id, { onDelete: 'cascade' }),
+    price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+    reason: text('reason'), // Optional note: 'Student discount', etc.
+    validFrom: timestamp('valid_from', { withTimezone: true }),
+    validUntil: timestamp('valid_until', { withTimezone: true }), // NULL = indefinite
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex('patient_pricing_patient_therapist_idx').on(table.patientId, table.therapistId),
+    index('patient_pricing_therapist_id_idx').on(table.therapistId),
+    index('patient_pricing_patient_id_idx').on(table.patientId),
+  ]
+);
+
+// Price history (audit trail)
+export const priceHistory = pgTable(
+  'price_history',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    therapistId: uuid('therapist_id')
+      .notNull()
+      .references(() => therapists.id, { onDelete: 'cascade' }),
+    entityType: priceEntityTypeEnum('entity_type').notNull(), // 'therapist', 'session_type', 'patient'
+    entityId: uuid('entity_id').notNull(), // ID of therapist/session_type/patient
+    oldPrice: decimal('old_price', { precision: 10, scale: 2 }),
+    newPrice: decimal('new_price', { precision: 10, scale: 2 }).notNull(),
+    changedAt: timestamp('changed_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('price_history_therapist_id_idx').on(table.therapistId),
+    index('price_history_entity_type_entity_id_idx').on(table.entityType, table.entityId),
+    index('price_history_changed_at_idx').on(table.changedAt),
+  ]
+);
+
 // Sessions table
 export const sessions = pgTable(
   'sessions',
@@ -390,6 +477,8 @@ export const sessions = pgTable(
     patientId: uuid('patient_id')
       .notNull()
       .references(() => patients.id, { onDelete: 'cascade' }),
+    sessionTypeId: uuid('session_type_id')
+      .references(() => sessionTypes.id, { onDelete: 'set null' }),
     calendarEventId: varchar('calendar_event_id', { length: 255 })
       .notNull()
       .unique(),
@@ -550,6 +639,9 @@ export const therapistsRelations = relations(therapists, ({ one, many }) => ({
   specializations: many(therapistSpecializations),
   approaches: many(therapistApproaches),
   languages: many(therapistLanguages),
+  sessionTypes: many(sessionTypes),
+  patientPricing: many(patientPricing),
+  priceHistory: many(priceHistory),
 }));
 
 export const oauthTokensRelations = relations(oauthTokens, ({ one }) => ({
@@ -617,12 +709,39 @@ export const therapistLanguagesRelations = relations(therapistLanguages, ({ one 
   }),
 }));
 
+export const sessionTypesRelations = relations(sessionTypes, ({ one, many }) => ({
+  therapist: one(therapists, {
+    fields: [sessionTypes.therapistId],
+    references: [therapists.id],
+  }),
+  sessions: many(sessions),
+}));
+
+export const patientPricingRelations = relations(patientPricing, ({ one }) => ({
+  patient: one(patients, {
+    fields: [patientPricing.patientId],
+    references: [patients.id],
+  }),
+  therapist: one(therapists, {
+    fields: [patientPricing.therapistId],
+    references: [therapists.id],
+  }),
+}));
+
+export const priceHistoryRelations = relations(priceHistory, ({ one }) => ({
+  therapist: one(therapists, {
+    fields: [priceHistory.therapistId],
+    references: [therapists.id],
+  }),
+}));
+
 export const patientsRelations = relations(patients, ({ one, many }) => ({
   therapist: one(therapists, {
     fields: [patients.therapistId],
     references: [therapists.id],
   }),
   sessions: many(sessions),
+  pricing: many(patientPricing),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one, many }) => ({
@@ -633,6 +752,10 @@ export const sessionsRelations = relations(sessions, ({ one, many }) => ({
   patient: one(patients, {
     fields: [sessions.patientId],
     references: [patients.id],
+  }),
+  sessionType: one(sessionTypes, {
+    fields: [sessions.sessionTypeId],
+    references: [sessionTypes.id],
   }),
   paymentPreference: one(paymentPreferences, {
     fields: [sessions.id],
@@ -728,3 +851,12 @@ export type NewTherapistApproach = typeof therapistApproaches.$inferInsert;
 
 export type TherapistLanguage = typeof therapistLanguages.$inferSelect;
 export type NewTherapistLanguage = typeof therapistLanguages.$inferInsert;
+
+export type SessionType = typeof sessionTypes.$inferSelect;
+export type NewSessionType = typeof sessionTypes.$inferInsert;
+
+export type PatientPricing = typeof patientPricing.$inferSelect;
+export type NewPatientPricing = typeof patientPricing.$inferInsert;
+
+export type PriceHistory = typeof priceHistory.$inferSelect;
+export type NewPriceHistory = typeof priceHistory.$inferInsert;
