@@ -203,6 +203,28 @@ export const pricingRouter = router({
     }),
 
   // Patient Pricing
+  listPatientPricing: therapistProcedure.query(async ({ ctx }) => {
+    const pricingList = await ctx.db
+      .select({
+        id: patientPricing.id,
+        patientId: patientPricing.patientId,
+        price: patientPricing.price,
+        reason: patientPricing.reason,
+        validFrom: patientPricing.validFrom,
+        validUntil: patientPricing.validUntil,
+        isActive: patientPricing.isActive,
+        createdAt: patientPricing.createdAt,
+        patientName: patients.name,
+        patientEmail: patients.email,
+      })
+      .from(patientPricing)
+      .innerJoin(patients, eq(patientPricing.patientId, patients.id))
+      .where(eq(patientPricing.therapistId, ctx.therapistId))
+      .orderBy(patients.name);
+
+    return pricingList;
+  }),
+
   getPatientPricing: therapistProcedure
     .input(z.object({ patientId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
