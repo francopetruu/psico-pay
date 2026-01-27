@@ -1,15 +1,21 @@
 /**
  * Setup Test User Script
  *
- * Creates a test user with credentials auth and associated therapist record.
- * Also migrates any orphaned data to this therapist.
+ * Creates a credentials-based user linked to an existing Google-authenticated
+ * therapist. This allows testing with both:
+ * - Credentials login (works on Vercel preview without OAuth setup)
+ * - Google OAuth login (when available)
+ *
+ * The same therapist profile is used, so Google Calendar integration works
+ * regardless of login method.
  *
  * Usage:
- *   npx tsx scripts/setup-test-user.ts
+ *   npx tsx scripts/setup-test-user.ts [therapist-email] [password]
  *
- * Default credentials:
- *   Email: tester@psicopay.com
- *   Password: tester1234
+ * Examples:
+ *   npx tsx scripts/setup-test-user.ts                           # Use defaults
+ *   npx tsx scripts/setup-test-user.ts petruu.fi@gmail.com       # Specify email
+ *   npx tsx scripts/setup-test-user.ts petruu.fi@gmail.com mypass # Specify both
  */
 
 import 'dotenv/config';
@@ -23,29 +29,61 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// Test user configuration
-const TEST_USER = {
-  email: 'tester@psicopay.com',
-  password: 'tester1234',
-  name: 'Usuario de Prueba',
-};
+// Default configuration
+const DEFAULT_EMAIL = 'petruu.fi@gmail.com';
+const DEFAULT_PASSWORD = 'tester1234';
 
 async function setupTestUser() {
   const client = await pool.connect();
 
+  // Get config from command line or use defaults
+  const targetEmail = process.argv[2] || DEFAULT_EMAIL;
+  const password = process.argv[3] || DEFAULT_PASSWORD;
+
   try {
     console.log('='.repeat(60));
-    console.log('SETUP: Creating test user with therapist profile');
+    console.log('SETUP: Add credentials login to existing therapist');
     console.log('='.repeat(60));
 
     await client.query('BEGIN');
 
-    // 1. Hash the password
-    const passwordHash = await bcrypt.hash(TEST_USER.password, 12);
-    console.log('\n✓ Password hashed');
+    // 1. Find existing therapist (preferably with Google OAuth)
+    console.log(`\n🔍 Looking for therapist: ${targetEmail}`);
+    const therapistResult = await client.query(
+      `SELECT id, email, name, google_id, user_id
+       FROM therapists
+       WHERE email = $1`,
+      [targetEmail]
+    );
 
-    // 2. Create or update user in users table
-    console.log('\n📝 Creating/updating user...');
+    if (therapistResult.rows.length === 0) {
+      console.log(`\n❌ Therapist not found: ${targetEmail}`);
+      console.log('   Please login with Google OAuth first to create the therapist.');
+      await client.query('ROLLBACK');
+      return;
+    }
+
+    const therapist = therapistResult.rows[0];
+    console.log(`   ✓ Found therapist: ${therapist.name}`);
+    console.log(`   → ID: ${therapist.id}`);
+    console.log(`   → Has Google OAuth: ${therapist.google_id ? 'Yes' : 'No'}`);
+    console.log(`   → Has User link: ${therapist.user_id ? 'Yes' : 'No'}`);
+
+    // 2. Check if therapist has Google OAuth tokens (for Calendar access)
+    const tokensResult = await client.query(
+      `SELECT id, provider, scope FROM oauth_tokens WHERE therapist_id = $1`,
+      [therapist.id]
+    );
+    if (tokensResult.rows.length > 0) {
+      console.log(`   → OAuth tokens: Yes (${tokensResult.rows[0].provider})`);
+    } else {
+      console.log(`   → OAuth tokens: No (Calendar sync won't work)`);
+    }
+
+    // 3. Create or update user with credentials
+    console.log('\n📝 Creating/updating credentials user...');
+    const passwordHash = await bcrypt.hash(password, 12);
+
     const userResult = await client.query(
       `INSERT INTO users (email, password_hash, name, role, is_active)
        VALUES ($1, $2, $3, 'therapist', true)
@@ -55,109 +93,149 @@ async function setupTestUser() {
          is_active = true,
          updated_at = NOW()
        RETURNING id, email, name`,
-      [TEST_USER.email, passwordHash, TEST_USER.name]
+      [targetEmail, passwordHash, therapist.name]
     );
     const user = userResult.rows[0];
     console.log(`   ✓ User: ${user.email} (ID: ${user.id})`);
 
-    // 3. Create or update therapist linked to this user
-    console.log('\n📝 Creating/updating therapist...');
-    const therapistResult = await client.query(
-      `INSERT INTO therapists (email, name, user_id, is_active, onboarding_completed)
-       VALUES ($1, $2, $3, true, true)
-       ON CONFLICT (email) DO UPDATE SET
-         name = $2,
-         user_id = $3,
-         is_active = true,
-         updated_at = NOW()
-       RETURNING id, email, name`,
-      [TEST_USER.email, TEST_USER.name, user.id]
+    // 4. Link user to therapist
+    console.log('\n🔗 Linking user to therapist...');
+    await client.query(
+      `UPDATE therapists SET user_id = $1, updated_at = NOW() WHERE id = $2`,
+      [user.id, therapist.id]
     );
-    const therapist = therapistResult.rows[0];
-    console.log(`   ✓ Therapist: ${therapist.email} (ID: ${therapist.id})`);
+    console.log(`   ✓ Linked user ${user.id} to therapist ${therapist.id}`);
 
-    // 4. Migrate orphaned patients to this therapist
-    console.log('\n🔄 Migrating orphaned patients...');
-    const patientResult = await client.query(
+    // 5. Migrate orphaned data to this therapist
+    console.log('\n🔄 Migrating orphaned data...');
+
+    const orphanedPatients = await client.query(
       `UPDATE patients
        SET therapist_id = $1, updated_at = NOW()
        WHERE therapist_id IS NULL
        RETURNING id, name`,
       [therapist.id]
     );
-    if (patientResult.rowCount && patientResult.rowCount > 0) {
-      console.log(`   ✓ Migrated ${patientResult.rowCount} patients:`);
-      patientResult.rows.forEach((p: any) => {
-        console.log(`     - ${p.name}`);
-      });
-    } else {
-      console.log('   (no orphaned patients found)');
+    if (orphanedPatients.rowCount && orphanedPatients.rowCount > 0) {
+      console.log(`   ✓ Migrated ${orphanedPatients.rowCount} orphaned patients`);
+      orphanedPatients.rows.forEach((p: any) => console.log(`     - ${p.name}`));
     }
 
-    // 5. Migrate orphaned sessions to this therapist
-    console.log('\n🔄 Migrating orphaned sessions...');
-    const sessionResult = await client.query(
+    const orphanedSessions = await client.query(
       `UPDATE sessions
        SET therapist_id = $1, updated_at = NOW()
        WHERE therapist_id IS NULL
        RETURNING id, amount, payment_status`,
       [therapist.id]
     );
-    if (sessionResult.rowCount && sessionResult.rowCount > 0) {
-      console.log(`   ✓ Migrated ${sessionResult.rowCount} sessions:`);
-      sessionResult.rows.forEach((s: any) => {
-        console.log(`     - $${s.amount} (${s.payment_status})`);
-      });
-    } else {
-      console.log('   (no orphaned sessions found)');
+    if (orphanedSessions.rowCount && orphanedSessions.rowCount > 0) {
+      console.log(`   ✓ Migrated ${orphanedSessions.rowCount} orphaned sessions`);
+      orphanedSessions.rows.forEach((s: any) => console.log(`     - $${s.amount} (${s.payment_status})`));
     }
 
-    // 6. Cleanup: remove old admin user if different email
-    console.log('\n🧹 Cleaning up old test users...');
-    const cleanupResult = await client.query(
+    // 6. Transfer data from other test therapists (like tester@psicopay.com)
+    console.log('\n🔄 Consolidating data from other test therapists...');
+
+    // Find and transfer patients from other therapists
+    const otherTherapists = await client.query(
+      `SELECT id, email FROM therapists
+       WHERE email LIKE '%@psicopay.com'
+       AND id != $1`,
+      [therapist.id]
+    );
+
+    for (const other of otherTherapists.rows) {
+      // Transfer patients
+      const transferred = await client.query(
+        `UPDATE patients
+         SET therapist_id = $1, updated_at = NOW()
+         WHERE therapist_id = $2
+         RETURNING name`,
+        [therapist.id, other.id]
+      );
+      if (transferred.rowCount && transferred.rowCount > 0) {
+        console.log(`   ✓ Transferred ${transferred.rowCount} patients from ${other.email}`);
+      }
+
+      // Transfer sessions
+      const transferredSessions = await client.query(
+        `UPDATE sessions
+         SET therapist_id = $1, updated_at = NOW()
+         WHERE therapist_id = $2
+         RETURNING id`,
+        [therapist.id, other.id]
+      );
+      if (transferredSessions.rowCount && transferredSessions.rowCount > 0) {
+        console.log(`   ✓ Transferred ${transferredSessions.rowCount} sessions from ${other.email}`);
+      }
+    }
+
+    // 7. Cleanup old test therapists and users
+    console.log('\n🧹 Cleaning up old test accounts...');
+
+    // Delete old test therapists (after transferring data)
+    const deletedTherapists = await client.query(
+      `DELETE FROM therapists
+       WHERE email LIKE '%@psicopay.com'
+       AND id != $1
+       RETURNING email`,
+      [therapist.id]
+    );
+    if (deletedTherapists.rowCount && deletedTherapists.rowCount > 0) {
+      deletedTherapists.rows.forEach((t: any) => console.log(`   ✓ Deleted therapist: ${t.email}`));
+    }
+
+    // Delete old test users
+    const deletedUsers = await client.query(
       `DELETE FROM users
-       WHERE email = 'admin@psicopay.com'
+       WHERE email LIKE '%@psicopay.com'
        AND email != $1
        RETURNING email`,
-      [TEST_USER.email]
+      [targetEmail]
     );
-    if (cleanupResult.rowCount && cleanupResult.rowCount > 0) {
-      console.log(`   ✓ Removed old user: admin@psicopay.com`);
-    } else {
-      console.log('   (no cleanup needed)');
+    if (deletedUsers.rowCount && deletedUsers.rowCount > 0) {
+      deletedUsers.rows.forEach((u: any) => console.log(`   ✓ Deleted user: ${u.email}`));
     }
 
     await client.query('COMMIT');
 
+    // 8. Summary
     console.log('\n' + '='.repeat(60));
     console.log('✅ SETUP COMPLETE!');
     console.log('='.repeat(60));
-    console.log('\n📋 Test User Credentials:');
-    console.log(`   Email:    ${TEST_USER.email}`);
-    console.log(`   Password: ${TEST_USER.password}`);
-    console.log('\n📋 Associated Data:');
+
+    console.log('\n📋 Credentials Login:');
+    console.log(`   Email:    ${targetEmail}`);
+    console.log(`   Password: ${password}`);
+
+    console.log('\n📋 Google OAuth Login:');
+    if (therapist.google_id) {
+      console.log(`   ✓ Available (same therapist profile)`);
+    } else {
+      console.log(`   ✗ Not configured yet`);
+    }
 
     // Verify final state
-    const verifyPatients = await client.query(
+    const finalPatients = await client.query(
       `SELECT name FROM patients WHERE therapist_id = $1`,
       [therapist.id]
     );
-    console.log(`   Patients: ${verifyPatients.rowCount}`);
-    verifyPatients.rows.forEach((p: any) => {
-      console.log(`     - ${p.name}`);
-    });
-
-    const verifySessions = await client.query(
+    const finalSessions = await client.query(
       `SELECT amount, payment_status FROM sessions WHERE therapist_id = $1`,
       [therapist.id]
     );
-    console.log(`   Sessions: ${verifySessions.rowCount}`);
-    verifySessions.rows.forEach((s: any) => {
-      console.log(`     - $${s.amount} (${s.payment_status})`);
-    });
 
-    console.log('\n🔐 Login URL: https://psico-pay-web.vercel.app/login');
-    console.log('   (Use credentials login, not Google)\n');
+    console.log('\n📋 Associated Data:');
+    console.log(`   Patients: ${finalPatients.rowCount}`);
+    finalPatients.rows.forEach((p: any) => console.log(`     - ${p.name}`));
+    console.log(`   Sessions: ${finalSessions.rowCount}`);
+    finalSessions.rows.forEach((s: any) => console.log(`     - $${s.amount} (${s.payment_status})`));
+
+    console.log('\n🔐 Test URLs:');
+    console.log('   Production: https://psico-pay-web.vercel.app/login');
+    console.log('   Preview:    Use any Vercel preview URL + /login');
+    console.log('\n💡 Tip: Use credentials login on preview deployments');
+    console.log('        (Google OAuth requires manual URL authorization)\n');
 
   } catch (error) {
     await client.query('ROLLBACK');
