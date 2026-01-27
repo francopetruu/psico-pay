@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { Plus, Trash2, Settings } from "lucide-react";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 export function SessionTypesSection() {
   const utils = trpc.useUtils();
@@ -132,6 +133,7 @@ function SessionTypeCard({
   const [editing, setEditing] = useState(false);
   const [price, setPrice] = useState(sessionType.price || "");
   const [useDefault, setUseDefault] = useState(sessionType.price === null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleSave = () => {
     onUpdate({
@@ -156,12 +158,24 @@ function SessionTypeCard({
         <Button
           variant="ghost"
           size="icon"
-          onClick={onDelete}
+          onClick={() => setShowDeleteConfirm(true)}
           disabled={isDeleting}
         >
           <Trash2 className="h-4 w-4 text-destructive" />
         </Button>
       </div>
+
+      <ConfirmationDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Eliminar tipo de sesion"
+        description={`¿Estas seguro de eliminar el tipo de sesion "${sessionType.name}"? Esta accion no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        onConfirm={onDelete}
+        variant="destructive"
+        isLoading={isDeleting}
+      />
 
       {sessionType.description && (
         <p className="text-sm text-muted-foreground mb-3">
