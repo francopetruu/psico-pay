@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -21,9 +20,24 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Plus, Trash2, Settings } from "lucide-react";
+import { Plus, Trash2, Settings, Clock, AlertCircle } from "lucide-react";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import {
+  PREDEFINED_SESSION_TYPES,
+  SESSION_TYPE_CATEGORIES,
+  getSessionTypesByCategory,
+  getSessionTypeById,
+} from "@/lib/session-types";
 
 export function SessionTypesSection() {
   const utils = trpc.useUtils();
@@ -73,6 +87,7 @@ export function SessionTypesSection() {
             isPending={createSessionType.isPending}
             defaultPrice={Number(defaults?.defaultSessionPrice) || 15000}
             currency={defaults?.currency || "ARS"}
+            existingTypeNames={sessionTypesList?.map((t) => t.name) || []}
           />
         </div>
       </CardHeader>
@@ -82,9 +97,18 @@ export function SessionTypesSection() {
             Cargando tipos de sesion...
           </p>
         ) : !sessionTypesList || sessionTypesList.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">
-            No has creado tipos de sesion personalizados
-          </p>
+          <div className="text-center py-8 space-y-4">
+            <p className="text-muted-foreground">
+              No has agregado tipos de sesion con precios diferenciados
+            </p>
+            <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg max-w-md mx-auto">
+              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <p className="text-left">
+                Agrega tipos de sesion como Terapia de Pareja, Sesion Individual - Niño, etc.
+                para definir precios especificos segun el tipo de atencion.
+              </p>
+            </div>
+          </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {sessionTypesList.map((type) => (
@@ -243,6 +267,7 @@ function AddSessionTypeDialog({
   isPending,
   defaultPrice,
   currency,
+  existingTypeNames,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -255,109 +280,154 @@ function AddSessionTypeDialog({
   isPending: boolean;
   defaultPrice: number;
   currency: string;
+  existingTypeNames: string[];
 }) {
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    durationMinutes: "50",
-    price: "",
-    useDefault: true,
-  });
+  const [selectedTypeId, setSelectedTypeId] = useState<string>("");
+  const [price, setPrice] = useState("");
+  const [useDefault, setUseDefault] = useState(true);
+
+  // Filtrar tipos que ya existen
+  const availableTypes = useMemo(() => {
+    return PREDEFINED_SESSION_TYPES.filter(
+      (type) => !existingTypeNames.includes(type.name)
+    );
+  }, [existingTypeNames]);
+
+  const selectedType = selectedTypeId ? getSessionTypeById(selectedTypeId) : null;
+  const typesByCategory = getSessionTypesByCategory();
 
   const handleSubmit = () => {
+    if (!selectedType) return;
+
     onAdd({
-      name: form.name,
-      description: form.description || undefined,
-      durationMinutes: parseInt(form.durationMinutes),
-      price: form.useDefault ? null : parseFloat(form.price),
+      name: selectedType.name,
+      description: selectedType.description,
+      durationMinutes: selectedType.defaultDurationMinutes,
+      price: useDefault ? null : parseFloat(price),
     });
-    setForm({
-      name: "",
-      description: "",
-      durationMinutes: "50",
-      price: "",
-      useDefault: true,
-    });
+
+    // Reset form
+    setSelectedTypeId("");
+    setPrice("");
+    setUseDefault(true);
+  };
+
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) {
+      // Reset form when closing
+      setSelectedTypeId("");
+      setPrice("");
+      setUseDefault(true);
+    }
+    onOpenChange(newOpen);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button>
+        <Button disabled={availableTypes.length === 0}>
           <Plus className="mr-2 h-4 w-4" />
           Agregar Tipo
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Nuevo Tipo de Sesion</DialogTitle>
+          <DialogTitle>Agregar Tipo de Sesion</DialogTitle>
           <DialogDescription>
-            Crea un nuevo tipo de sesion con precio personalizado
+            Selecciona un tipo de sesion y define su precio
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label>Nombre</Label>
-            <Input
-              placeholder="Ej: Terapia de Pareja"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Descripcion (opcional)</Label>
-            <Textarea
-              placeholder="Descripcion del tipo de sesion..."
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Duracion (minutos)</Label>
-            <Input
-              type="number"
-              min={15}
-              max={240}
-              value={form.durationMinutes}
-              onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="useDefaultPrice"
-                checked={form.useDefault}
-                onChange={(e) => setForm({ ...form, useDefault: e.target.checked })}
-                className="rounded"
-              />
-              <Label htmlFor="useDefaultPrice">
-                Usar precio base ({currency} ${defaultPrice.toLocaleString("es-AR")})
-              </Label>
+          {availableTypes.length === 0 ? (
+            <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg">
+              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <p>Ya has agregado todos los tipos de sesion disponibles.</p>
             </div>
-            {!form.useDefault && (
-              <div className="relative mt-2">
-                <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
-                <Input
-                  type="number"
-                  className="pl-8"
-                  placeholder="20000"
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                />
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label>Tipo de Sesion</Label>
+                <Select value={selectedTypeId} onValueChange={setSelectedTypeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar tipo de sesion..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(typesByCategory).map(([category, types]) => {
+                      const availableInCategory = types.filter(
+                        (t) => !existingTypeNames.includes(t.name)
+                      );
+                      if (availableInCategory.length === 0) return null;
+
+                      return (
+                        <SelectGroup key={category}>
+                          <SelectLabel>
+                            {SESSION_TYPE_CATEGORIES[category as keyof typeof SESSION_TYPE_CATEGORIES]?.label}
+                          </SelectLabel>
+                          {availableInCategory.map((type) => (
+                            <SelectItem key={type.id} value={type.id}>
+                              {type.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
-          </div>
+
+              {selectedType && (
+                <>
+                  <div className="bg-muted/50 p-3 rounded-lg space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      {selectedType.description}
+                    </p>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span>Duracion: {selectedType.defaultDurationMinutes} minutos</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="useDefaultPrice"
+                        checked={useDefault}
+                        onChange={(e) => setUseDefault(e.target.checked)}
+                        className="rounded"
+                      />
+                      <Label htmlFor="useDefaultPrice">
+                        Usar precio base ({currency} ${defaultPrice.toLocaleString("es-AR")})
+                      </Label>
+                    </div>
+                    {!useDefault && (
+                      <div className="relative mt-2">
+                        <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                        <Input
+                          type="number"
+                          className="pl-8"
+                          placeholder="20000"
+                          value={price}
+                          onChange={(e) => setPrice(e.target.value)}
+                          min={0}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Cancelar
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isPending || !form.name || (!form.useDefault && !form.price)}
+            disabled={isPending || !selectedTypeId || (!useDefault && !price)}
           >
-            {isPending ? "Creando..." : "Crear"}
+            {isPending ? "Agregando..." : "Agregar"}
           </Button>
         </DialogFooter>
       </DialogContent>
