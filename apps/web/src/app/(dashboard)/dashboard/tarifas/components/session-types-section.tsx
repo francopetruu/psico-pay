@@ -351,7 +351,13 @@ function AddSessionTypeDialog({
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar tipo de sesion..." />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent
+                    position="popper"
+                    side="bottom"
+                    align="start"
+                    sideOffset={4}
+                    className="max-h-[300px]"
+                  >
                     {Object.entries(typesByCategory).map(([category, types]) => {
                       const availableInCategory = types.filter(
                         (t) => !existingTypeNames.includes(t.name)
