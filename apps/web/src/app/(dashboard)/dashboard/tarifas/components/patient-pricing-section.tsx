@@ -15,6 +15,7 @@ import { Plus, User, Pencil, Trash2, AlertCircle } from "lucide-react";
 import { format, differenceInDays, isPast, isFuture } from "date-fns";
 import { es } from "date-fns/locale";
 import { PatientPricingDialog } from "./patient-pricing-dialog";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 export function PatientPricingSection() {
   const utils = trpc.useUtils();
@@ -31,6 +32,11 @@ export function PatientPricingSection() {
     validFrom: Date | null;
     validUntil: Date | null;
   } | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    open: boolean;
+    patientId: string;
+    patientName: string;
+  }>({ open: false, patientId: "", patientName: "" });
 
   const removePatientPricing = trpc.pricing.removePatientPricing.useMutation({
     onSuccess: () => {
@@ -52,10 +58,13 @@ export function PatientPricingSection() {
     setDialogOpen(true);
   };
 
-  const handleDelete = async (patientId: string) => {
-    if (confirm("¿Estas seguro de eliminar el precio especial para este paciente?")) {
-      await removePatientPricing.mutateAsync({ patientId });
-    }
+  const handleDeleteClick = (patientId: string, patientName: string) => {
+    setDeleteConfirmation({ open: true, patientId, patientName });
+  };
+
+  const handleDeleteConfirm = async () => {
+    await removePatientPricing.mutateAsync({ patientId: deleteConfirmation.patientId });
+    setDeleteConfirmation({ open: false, patientId: "", patientName: "" });
   };
 
   const handleDialogClose = () => {
@@ -189,7 +198,7 @@ export function PatientPricingSection() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDelete(pricing.patientId)}
+                    onClick={() => handleDeleteClick(pricing.patientId, pricing.patientName)}
                     disabled={removePatientPricing.isPending}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
@@ -215,6 +224,20 @@ export function PatientPricingSection() {
         patientsWithoutPricing={patientsWithoutPricing || []}
         defaultPrice={defaultPrice}
         currency={currency}
+      />
+
+      <ConfirmationDialog
+        open={deleteConfirmation.open}
+        onOpenChange={(open) =>
+          setDeleteConfirmation((prev) => ({ ...prev, open }))
+        }
+        title="Eliminar precio especial"
+        description={`¿Estas seguro de eliminar el precio especial para ${deleteConfirmation.patientName}? Esta accion no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        onConfirm={handleDeleteConfirm}
+        variant="destructive"
+        isLoading={removePatientPricing.isPending}
       />
     </Card>
   );
