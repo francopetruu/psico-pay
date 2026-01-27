@@ -8,10 +8,10 @@ import {
   Users,
   CreditCard,
   BarChart3,
-  Settings,
   LogOut,
   Home,
   User,
+  Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ const navigation = [
   { name: "Sesiones", href: "/dashboard/sessions", icon: Calendar },
   { name: "Pacientes", href: "/dashboard/patients", icon: Users },
   { name: "Pagos", href: "/dashboard/payments", icon: CreditCard },
+  { name: "Tarifas", href: "/dashboard/tarifas", icon: Receipt },
   { name: "Reportes", href: "/dashboard/reports", icon: BarChart3 },
   { name: "Mi Perfil", href: "/dashboard/profile", icon: User },
 ];
@@ -72,18 +73,6 @@ export function Sidebar() {
             <p className="text-xs text-muted-foreground truncate">{session.user.email}</p>
           </div>
         )}
-        <Link
-          href="/dashboard/settings/pricing"
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-            pathname.startsWith("/dashboard/settings")
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-          )}
-        >
-          <Settings className="h-5 w-5" />
-          Configuracion
-        </Link>
         <Button
           variant="ghost"
           className="w-full justify-start gap-3 text-muted-foreground"
