@@ -18,8 +18,11 @@ PsicoPay automates the payment collection process for psychology sessions by:
 - **Google Calendar Integration**: Automatic session detection from calendar events
 - **WhatsApp Notifications**: Patient communication via Twilio
 - **Mercado Pago Integration**: Secure payment processing with webhooks
-- **Management Dashboard**: View sessions, patients, payments, and reports
-- **Authentication**: Secure login with NextAuth.js
+- **Management Dashboard**: View sessions, patients, payments, reports, and pricing
+- **Multi-Tenant Architecture**: Each therapist has isolated data and settings
+- **Google OAuth**: Secure authentication with Google accounts
+- **Dynamic Pricing**: Three-tier pricing system (patient > session type > base)
+- **Professional Profiles**: Therapist profile management with license and business info
 - **Analytics**: Revenue reports, payment status distribution, and trends
 
 ## How It Works
@@ -70,8 +73,15 @@ psico-pay/
 │   └── web/                 # Next.js Dashboard
 │       ├── src/
 │       │   ├── app/         # App Router pages
+│       │   │   └── dashboard/
+│       │   │       ├── sessions/
+│       │   │       ├── patients/
+│       │   │       ├── payments/
+│       │   │       ├── tarifas/    # Pricing module
+│       │   │       ├── reports/
+│       │   │       └── profile/
 │       │   ├── components/  # UI components
-│       │   ├── lib/         # Utils, auth, db, trpc
+│       │   ├── lib/         # Utils, auth, db, trpc, session-types
 │       │   └── server/      # tRPC routers
 │       └── scripts/         # Admin scripts
 │
@@ -211,11 +221,23 @@ Pull requests require all CI checks to pass before merging:
 - Payment history with filtering
 - Collection rate metrics
 
+### Tarifas (Pricing)
+- **Precio Base**: Default session price and duration
+- **Tipos de Sesion**: 21 predefined session types (individual, pareja, familia, grupo, evaluacion, especial)
+- **Por Paciente**: Patient-specific pricing with validity dates
+- Price history tracking
+- Three-tier pricing priority: patient > session type > base
+
 ### Reports
 - Revenue trends over time
 - Payment status distribution (pie chart)
 - Monthly revenue (line chart)
 - Top patients by revenue
+
+### Mi Perfil (Profile)
+- Professional license and specialty
+- Business information (name, CUIT, address)
+- Professional bio
 
 ## Environment Variables
 
