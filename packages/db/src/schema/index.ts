@@ -11,6 +11,8 @@ import {
   index,
   uniqueIndex,
   jsonb,
+  time,
+  date,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -92,6 +94,11 @@ export const priceEntityTypeEnum = pgEnum('price_entity_type', [
   'patient',
 ]);
 
+export const availabilityExceptionTypeEnum = pgEnum('availability_exception_type', [
+  'block',      // Time off / unavailable
+  'available',  // Extra availability outside normal hours
+]);
+
 // Users table (for dashboard authentication)
 export const users = pgTable(
   'users',
@@ -143,6 +150,12 @@ export const therapists = pgTable(
 
     // Calendar configuration
     googleCalendarId: varchar('google_calendar_id', { length: 255 }),
+
+    // Availability & booking configuration
+    bufferBeforeMinutes: integer('buffer_before_minutes').notNull().default(0),
+    bufferAfterMinutes: integer('buffer_after_minutes').notNull().default(15),
+    minAdvanceBookingHours: integer('min_advance_booking_hours').notNull().default(24),
+    maxAdvanceBookingDays: integer('max_advance_booking_days').notNull().default(60),
 
     // Status
     isActive: boolean('is_active').notNull().default(true),
@@ -466,6 +479,68 @@ export const priceHistory = pgTable(
   ]
 );
 
+// Availability rules table (weekly schedule)
+export const availabilityRules = pgTable(
+  'availability_rules',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    therapistId: uuid('therapist_id')
+      .notNull()
+      .references(() => therapists.id, { onDelete: 'cascade' }),
+    dayOfWeek: integer('day_of_week').notNull(), // 0=Sunday, 1=Monday, ..., 6=Saturday
+    startTime: time('start_time').notNull(), // e.g., '09:00'
+    endTime: time('end_time').notNull(), // e.g., '18:00'
+    isAvailable: boolean('is_available').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index('availability_rules_therapist_id_idx').on(table.therapistId),
+    index('availability_rules_day_of_week_idx').on(table.dayOfWeek),
+    // Unique constraint: one rule per therapist per day/time slot
+    uniqueIndex('availability_rules_therapist_day_time_idx').on(
+      table.therapistId,
+      table.dayOfWeek,
+      table.startTime,
+      table.endTime
+    ),
+  ]
+);
+
+// Availability exceptions table (one-time blocks or extra availability)
+export const availabilityExceptions = pgTable(
+  'availability_exceptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    therapistId: uuid('therapist_id')
+      .notNull()
+      .references(() => therapists.id, { onDelete: 'cascade' }),
+    exceptionDate: date('exception_date').notNull(),
+    startTime: time('start_time'), // NULL if all_day is true
+    endTime: time('end_time'), // NULL if all_day is true
+    allDay: boolean('all_day').notNull().default(false),
+    exceptionType: availabilityExceptionTypeEnum('exception_type').notNull().default('block'),
+    reason: text('reason'), // e.g., "Vacaciones", "Feriado", "Congreso"
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index('availability_exceptions_therapist_id_idx').on(table.therapistId),
+    index('availability_exceptions_date_idx').on(table.exceptionDate),
+    index('availability_exceptions_therapist_date_idx').on(table.therapistId, table.exceptionDate),
+  ]
+);
+
 // Sessions table
 export const sessions = pgTable(
   'sessions',
@@ -642,6 +717,8 @@ export const therapistsRelations = relations(therapists, ({ one, many }) => ({
   sessionTypes: many(sessionTypes),
   patientPricing: many(patientPricing),
   priceHistory: many(priceHistory),
+  availabilityRules: many(availabilityRules),
+  availabilityExceptions: many(availabilityExceptions),
 }));
 
 export const oauthTokensRelations = relations(oauthTokens, ({ one }) => ({
@@ -731,6 +808,20 @@ export const patientPricingRelations = relations(patientPricing, ({ one }) => ({
 export const priceHistoryRelations = relations(priceHistory, ({ one }) => ({
   therapist: one(therapists, {
     fields: [priceHistory.therapistId],
+    references: [therapists.id],
+  }),
+}));
+
+export const availabilityRulesRelations = relations(availabilityRules, ({ one }) => ({
+  therapist: one(therapists, {
+    fields: [availabilityRules.therapistId],
+    references: [therapists.id],
+  }),
+}));
+
+export const availabilityExceptionsRelations = relations(availabilityExceptions, ({ one }) => ({
+  therapist: one(therapists, {
+    fields: [availabilityExceptions.therapistId],
     references: [therapists.id],
   }),
 }));
@@ -860,3 +951,9 @@ export type NewPatientPricing = typeof patientPricing.$inferInsert;
 
 export type PriceHistory = typeof priceHistory.$inferSelect;
 export type NewPriceHistory = typeof priceHistory.$inferInsert;
+
+export type AvailabilityRule = typeof availabilityRules.$inferSelect;
+export type NewAvailabilityRule = typeof availabilityRules.$inferInsert;
+
+export type AvailabilityException = typeof availabilityExceptions.$inferSelect;
+export type NewAvailabilityException = typeof availabilityExceptions.$inferInsert;
