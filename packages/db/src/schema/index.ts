@@ -99,6 +99,14 @@ export const availabilityExceptionTypeEnum = pgEnum('availability_exception_type
   'available',  // Extra availability outside normal hours
 ]);
 
+export const bookingStatusEnum = pgEnum('booking_status', [
+  'pending',    // Awaiting confirmation/payment
+  'confirmed',  // Confirmed (paid or trusted patient)
+  'cancelled',  // Cancelled by patient or therapist
+  'completed',  // Session completed
+  'no_show',    // Patient didn't show up
+]);
+
 // Users table (for dashboard authentication)
 export const users = pgTable(
   'users',
@@ -541,6 +549,60 @@ export const availabilityExceptions = pgTable(
   ]
 );
 
+// Bookings table (patient self-scheduling)
+export const bookings = pgTable(
+  'bookings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    therapistId: uuid('therapist_id')
+      .notNull()
+      .references(() => therapists.id, { onDelete: 'cascade' }),
+    // Patient can be null for new patients booking for first time
+    patientId: uuid('patient_id')
+      .references(() => patients.id, { onDelete: 'set null' }),
+    sessionTypeId: uuid('session_type_id')
+      .references(() => sessionTypes.id, { onDelete: 'set null' }),
+
+    // Scheduled time
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
+    durationMinutes: integer('duration_minutes').notNull().default(50),
+
+    // Patient info (for new patients or to store at booking time)
+    patientName: varchar('patient_name', { length: 255 }).notNull(),
+    patientEmail: varchar('patient_email', { length: 255 }),
+    patientPhone: varchar('patient_phone', { length: 20 }).notNull(),
+
+    // Booking details
+    notes: text('notes'), // Notes from patient
+    amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+    status: bookingStatusEnum('status').notNull().default('pending'),
+
+    // Status timestamps
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancellationReason: text('cancellation_reason'),
+
+    // Link to created session (after confirmation)
+    sessionId: uuid('session_id')
+      .references(() => sessions.id, { onDelete: 'set null' }),
+
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index('bookings_therapist_id_idx').on(table.therapistId),
+    index('bookings_patient_id_idx').on(table.patientId),
+    index('bookings_scheduled_at_idx').on(table.scheduledAt),
+    index('bookings_status_idx').on(table.status),
+    index('bookings_therapist_scheduled_idx').on(table.therapistId, table.scheduledAt),
+  ]
+);
+
 // Sessions table
 export const sessions = pgTable(
   'sessions',
@@ -719,6 +781,7 @@ export const therapistsRelations = relations(therapists, ({ one, many }) => ({
   priceHistory: many(priceHistory),
   availabilityRules: many(availabilityRules),
   availabilityExceptions: many(availabilityExceptions),
+  bookings: many(bookings),
 }));
 
 export const oauthTokensRelations = relations(oauthTokens, ({ one }) => ({
@@ -826,6 +889,25 @@ export const availabilityExceptionsRelations = relations(availabilityExceptions,
   }),
 }));
 
+export const bookingsRelations = relations(bookings, ({ one }) => ({
+  therapist: one(therapists, {
+    fields: [bookings.therapistId],
+    references: [therapists.id],
+  }),
+  patient: one(patients, {
+    fields: [bookings.patientId],
+    references: [patients.id],
+  }),
+  sessionType: one(sessionTypes, {
+    fields: [bookings.sessionTypeId],
+    references: [sessionTypes.id],
+  }),
+  session: one(sessions, {
+    fields: [bookings.sessionId],
+    references: [sessions.id],
+  }),
+}));
+
 export const patientsRelations = relations(patients, ({ one, many }) => ({
   therapist: one(therapists, {
     fields: [patients.therapistId],
@@ -833,6 +915,7 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
   }),
   sessions: many(sessions),
   pricing: many(patientPricing),
+  bookings: many(bookings),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one, many }) => ({
@@ -854,6 +937,10 @@ export const sessionsRelations = relations(sessions, ({ one, many }) => ({
   }),
   notifications: many(notifications),
   notes: many(sessionNotes),
+  booking: one(bookings, {
+    fields: [sessions.id],
+    references: [bookings.sessionId],
+  }),
 }));
 
 export const paymentPreferencesRelations = relations(
@@ -957,3 +1044,6 @@ export type NewAvailabilityRule = typeof availabilityRules.$inferInsert;
 
 export type AvailabilityException = typeof availabilityExceptions.$inferSelect;
 export type NewAvailabilityException = typeof availabilityExceptions.$inferInsert;
+
+export type Booking = typeof bookings.$inferSelect;
+export type NewBooking = typeof bookings.$inferInsert;
