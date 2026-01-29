@@ -12,6 +12,7 @@ import {
   Home,
   User,
   Receipt,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Pacientes", href: "/dashboard/patients", icon: Users },
   { name: "Pagos", href: "/dashboard/payments", icon: CreditCard },
   { name: "Tarifas", href: "/dashboard/tarifas", icon: Receipt },
+  { name: "Disponibilidad", href: "/dashboard/disponibilidad", icon: Clock },
   { name: "Reportes", href: "/dashboard/reports", icon: BarChart3 },
   { name: "Mi Perfil", href: "/dashboard/profile", icon: User },
 ];
